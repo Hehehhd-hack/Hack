@@ -1,7 +1,7 @@
 -- ============================================
 -- Infinity Gauntlet | Thanos Simulator
--- "P" Edition — Hidden Wide UI · v4.0
--- Auto-Collect · Auto-Farm · Full Weapon System
+-- "P" Edition — Hidden Wide UI · v4.1
+-- Full Drag · Auto-Collect · Full Weapons
 -- Delta Executor (Mobile) Compatible
 -- ============================================
 
@@ -51,10 +51,9 @@ local checkRequirements, autoEquipBest, notify
 local getNPCsByName, getItemCount, findItem
 
 -- ============================================
--- THEME — Deep Purple / Gold "P" Aesthetic
+-- THEME
 -- ============================================
 local Theme = {
-    -- Base
     Bg          = Color3.fromRGB(12, 10, 20),
     BgDeep      = Color3.fromRGB(8, 6, 15),
     Panel       = Color3.fromRGB(20, 16, 32),
@@ -65,7 +64,6 @@ local Theme = {
     Border      = Color3.fromRGB(90, 65, 140),
     BorderDim   = Color3.fromRGB(55, 42, 85),
 
-    -- Accents
     Purple      = Color3.fromRGB(155, 85, 255),
     PurpleDeep  = Color3.fromRGB(80, 20, 160),
     PurpleMid   = Color3.fromRGB(110, 50, 200),
@@ -81,13 +79,11 @@ local Theme = {
     Orange      = Color3.fromRGB(255, 135, 55),
     Blue        = Color3.fromRGB(80, 120, 220),
 
-    -- Text
     Text        = Color3.fromRGB(240, 235, 255),
     TextDim     = Color3.fromRGB(165, 155, 190),
     TextMuted   = Color3.fromRGB(110, 100, 135),
     TextGold    = Color3.fromRGB(255, 215, 100),
 
-    -- Stone Colors
     StoneSpace   = Color3.fromRGB(120, 80, 255),
     StoneReality = Color3.fromRGB(220, 40, 60),
     StoneTime    = Color3.fromRGB(0, 200, 100),
@@ -120,7 +116,7 @@ local Config = {
     FarmSpeed        = 0.1,
     AutoSoulFarm     = false,
 
-    -- Auto Collect Items
+    -- Auto Collect
     AutoCollectStones = false,
     AutoPowerStone    = false,
     AutoCollectFrost  = false,
@@ -150,7 +146,7 @@ local Config = {
     NoClip          = false,
     InfiniteJump    = false,
 
-    -- New Hacks
+    -- Hacks
     GodMode         = false,
     Fly             = false,
     FlySpeed        = 60,
@@ -178,7 +174,6 @@ local Config = {
     UIPosition      = UDim2.new(0.5, -280, 0.5, -180),
 }
 
--- Persistent State
 if not getgenv().ThanosSim then
     getgenv().ThanosSim = {
         KillCount      = 0,
@@ -198,7 +193,7 @@ end
 local State = getgenv().ThanosSim
 
 -- ============================================
--- WEAPON DATABASE (Full Wiki Data)
+-- WEAPON DATABASE
 -- ============================================
 local WeaponDB = {
     {
@@ -254,7 +249,7 @@ local WeaponDB = {
         name = "Secret Weapon",
         requirements = { kills = 800, fragments = 0, stones = {}, items = {} },
         description = "800 kills. Find at secret location.",
-        color = Theme.Pink,
+        color = Theme.Pink or Theme.Purple,
         autoEquipPriority = 3,
     },
     {
@@ -265,6 +260,8 @@ local WeaponDB = {
         autoEquipPriority = 2,
     },
 }
+-- Add Pink alias if missing
+if not Theme.Pink then Theme.Pink = Color3.fromRGB(255, 90, 180) end
 
 -- ============================================
 -- UTILITY FUNCTIONS
@@ -476,7 +473,6 @@ checkRequirements = function(weaponName)
 
     local missing = {}
 
-    -- Kills check
     if weapon.requirements.kills > 0 then
         local currentKills = State.KillCount or 0
         if currentKills < weapon.requirements.kills then
@@ -484,7 +480,6 @@ checkRequirements = function(weaponName)
         end
     end
 
-    -- Fragments check
     if weapon.requirements.fragments > 0 then
         local currentFrags = State.FragmentCount or 0
         if currentFrags < weapon.requirements.fragments then
@@ -492,7 +487,6 @@ checkRequirements = function(weaponName)
         end
     end
 
-    -- Stones check
     for _, stone in ipairs(weapon.requirements.stones or {}) do
         local stoneKey = stone:gsub(" Stone", "")
         if not Config.StonesCollected[stoneKey] and not State.StonesCollected[stoneKey] then
@@ -500,7 +494,6 @@ checkRequirements = function(weaponName)
         end
     end
 
-    -- Items check
     local ownedItems = getOwnedItems()
     for _, item in ipairs(weapon.requirements.items or {}) do
         local found = false
@@ -723,7 +716,7 @@ local function killAuraLoop()
 end
 
 -- ============================================
--- AUTO FARM / SOUL FARM
+-- AUTO FARM
 -- ============================================
 local function autoFarmLoop()
     task.spawn(function()
@@ -813,7 +806,7 @@ local function autoCollectStonesLoop()
 end
 
 -- ============================================
--- AUTO COLLECT LUNAR FRAGMENT
+-- AUTO COLLECT LUNAR
 -- ============================================
 local function autoCollectLunarLoop()
     task.spawn(function()
@@ -837,14 +830,13 @@ local function autoCollectLunarLoop()
 end
 
 -- ============================================
--- AUTO COLLECT CELESTIAL FRAGMENT
+-- AUTO COLLECT CELESTIAL
 -- ============================================
 local function autoCollectCelestialLoop()
     task.spawn(function()
         while Config.AutoCollectCelestial do
             pcall(function()
                 if State.CelestialFragment then return end
-                -- Find the rock in Catacombs lower section
                 local rock = findObjectByTerms({"rock", "frozen", "celestial rock"})
                 if rock then
                     local part = rock:IsA("Model") and (rock:FindFirstChild("Handle") or rock:FindFirstChildWhichIsA("BasePart")) or rock
@@ -853,7 +845,6 @@ local function autoCollectCelestialLoop()
                         if hrp then
                             hrp.CFrame = part.CFrame * CFrame.new(0, 5, 0)
                             task.wait(0.5)
-                            -- Use Casket of Ancient Winters M1 to freeze
                             local casket = findItem("casket")
                             if casket then
                                 local char = getCharacter()
@@ -868,7 +859,6 @@ local function autoCollectCelestialLoop()
                                 end)
                             end
                             task.wait(1)
-                            -- Use Cosmi-Rod Q move
                             local cosmi = findItem("cosmi")
                             if cosmi then
                                 local char = getCharacter()
@@ -883,7 +873,6 @@ local function autoCollectCelestialLoop()
                                 end)
                             end
                             task.wait(1)
-                            -- Click the spawned fragment
                             pcall(function()
                                 VirtualUser:CaptureController()
                                 VirtualUser:ClickButton1(Vector2.new(0, 0))
@@ -898,7 +887,7 @@ local function autoCollectCelestialLoop()
 end
 
 -- ============================================
--- AUTO COLLECT FROST FRAGMENTS
+-- AUTO COLLECT FROST
 -- ============================================
 local function autoCollectFrostLoop()
     task.spawn(function()
@@ -954,15 +943,13 @@ local function autoKillForUpgradeLoop()
                 local requiredKills = 200000
                 local currentKills = State.KillCount or 0
                 if currentKills >= requiredKills then
-                    -- Switch to auto upgrade mode
                     Config.AutoUpgradeGauntlet = true
                     Config.AutoKillForUpgrade = false
                     pcall(function()
-                        notify("Upgrade Ready", "200k kills reached. Upgrading Gauntlet...", Theme.Emerald, 5)
+                        notify("Upgrade Ready", "200k kills reached. Upgrading...", Theme.Emerald, 5)
                     end)
                     return
                 end
-                -- Use throw-above kill for faster farming
                 local target = getClosestNPC()
                 if target then
                     throwAboveKill(target)
@@ -1316,10 +1303,9 @@ notify = function(title, text, color, duration)
 end
 
 -- ============================================
--- UI BUILD — WIDE LAYOUT (v4.0)
+-- UI BUILD — WIDE + FULL DRAG
 -- ============================================
 local function createUI()
-    -- Safe cleanup
     pcall(function()
         local old = PlayerGui:FindFirstChild("P_ThanosSim")
         if old then old:Destroy() end
@@ -1329,7 +1315,6 @@ local function createUI()
         if oldCore then oldCore:Destroy() end
     end)
 
-    -- Pick best parent
     local guiParent = PlayerGui
     pcall(function()
         if gethui then guiParent = gethui() end
@@ -1358,9 +1343,7 @@ local function createUI()
     obStroke.Color = Theme.Purple
     obStroke.Thickness = 2
 
-    -- ==========================================
     -- MAIN FRAME — WIDE
-    -- ==========================================
     local Main = Instance.new("Frame")
     Main.Name = "Main"
     Main.Size = UDim2.new(0, 560, 0, 360)
@@ -1390,7 +1373,7 @@ local function createUI()
     sizeConstraint.MaxSize = Vector2.new(900, 700)
     sizeConstraint.Parent = Main
 
-    -- ========== TITLE BAR ==========
+    -- TITLE BAR
     local TitleBar = Instance.new("Frame")
     TitleBar.Name = "TitleBar"
     TitleBar.Size = UDim2.new(1, 0, 0, 48)
@@ -1409,7 +1392,6 @@ local function createUI()
     tGrad.Color = ColorSequence.new(Theme.PurpleDeep, Theme.Panel)
     tGrad.Rotation = 0
 
-    -- Moon Logo
     local LogoHolder = Instance.new("Frame")
     LogoHolder.Size = UDim2.new(0, 28, 0, 28)
     LogoHolder.Position = UDim2.new(0, 14, 0.5, -14)
@@ -1434,7 +1416,6 @@ local function createUI()
     LogoCut.Parent = LogoHolder
     Instance.new("UICorner", LogoCut).CornerRadius = UDim.new(1, 0)
 
-    -- Title text
     local TitleLbl = Instance.new("TextLabel")
     TitleLbl.Size = UDim2.new(1, -200, 0, 18)
     TitleLbl.Position = UDim2.new(0, 50, 0, 8)
@@ -1450,14 +1431,13 @@ local function createUI()
     SubLbl.Size = UDim2.new(1, -200, 0, 12)
     SubLbl.Position = UDim2.new(0, 50, 0, 27)
     SubLbl.BackgroundTransparency = 1
-    SubLbl.Text = "P edition · v4.0 · wide"
+    SubLbl.Text = "P edition · v4.1 · wide"
     SubLbl.TextColor3 = Theme.Gold
     SubLbl.Font = Enum.Font.Gotham
     SubLbl.TextSize = 10
     SubLbl.TextXAlignment = Enum.TextXAlignment.Left
     SubLbl.Parent = TitleBar
 
-    -- Header buttons
     local function headerBtn(icon, xOff, bg)
         local b = Instance.new("TextButton")
         b.Size = UDim2.new(0, 26, 0, 26)
@@ -1478,7 +1458,7 @@ local function createUI()
     local ResizePlus = headerBtn("+", -130, Theme.Card)
     local CloseBtn = headerBtn("×", -34, Theme.Crimson)
 
-    -- ========== GREETING BAR ==========
+    -- GREETING BAR
     local GreetingBar = Instance.new("Frame")
     GreetingBar.Size = UDim2.new(1, -16, 0, 38)
     GreetingBar.Position = UDim2.new(0, 8, 0, 54)
@@ -1532,7 +1512,7 @@ local function createUI()
     StatsBar.TextXAlignment = Enum.TextXAlignment.Left
     StatsBar.Parent = GreetingBar
 
-    -- ========== TAB BAR (HORIZONTAL SCROLL) ==========
+    -- TAB BAR
     local TabBar = Instance.new("ScrollingFrame")
     TabBar.Name = "TabBar"
     TabBar.Size = UDim2.new(1, -16, 0, 34)
@@ -1549,7 +1529,7 @@ local function createUI()
     tabLayout.Padding = UDim.new(0, 5)
     tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-    -- ========== CONTENT AREA ==========
+    -- CONTENT
     local Content = Instance.new("ScrollingFrame")
     Content.Name = "Content"
     Content.Size = UDim2.new(1, -16, 1, -160)
@@ -1568,7 +1548,7 @@ local function createUI()
     contentPad.PaddingLeft = UDim.new(0, 8)
     contentPad.PaddingRight = UDim.new(0, 8)
 
-    -- ========== FOOTER ==========
+    -- FOOTER
     local Footer = Instance.new("Frame")
     Footer.Name = "Footer"
     Footer.Size = UDim2.new(1, -16, 0, 24)
@@ -1596,7 +1576,7 @@ local function createUI()
     StatusDot.BorderSizePixel = 0
     Instance.new("UICorner", StatusDot).CornerRadius = UDim.new(1, 0)
 
-    -- ========== COLLAPSE ==========
+    -- COLLAPSE
     local function setCollapsed(state)
         Config.Collapsed = state
         TabBar.Visible = not state
@@ -1637,22 +1617,23 @@ local function createUI()
         TweenService:Create(UIScale, TweenInfo.new(0.12), { Scale = Config.UIScaleValue }):Play()
     end)
 
-    -- ========== DRAG (FULL SCREEN) ==========
-    local dragging, dragStart, startPos
+    -- ============================================
+    -- DRAG — FULL SCREEN (FIXED)
+    -- ============================================
+    local dragging = false
+    local dragStart, startPos
+
+    -- Full-free clamp: only 25px must stay on screen so it can always be grabbed back
     local function clampPos(pos, obj)
         local vp = Workspace.CurrentCamera.ViewportSize
         local size = obj.AbsoluteSize
-        -- Allow full drag across screen, keep at least a small margin
-        local minX = -size.X + 80
-        local maxX = vp.X - 80
-        local minY = 0
-        local maxY = vp.Y - 40
-        local x = math.clamp(pos.X.Offset, minX, maxX)
-        local y = math.clamp(pos.Y.Offset, minY, maxY)
+        local margin = 25
+        local x = math.clamp(pos.X.Offset, -size.X + margin, vp.X - margin)
+        local y = math.clamp(pos.Y.Offset, -size.Y + margin, vp.Y - margin)
         return UDim2.new(pos.X.Scale, x, pos.Y.Scale, y)
     end
 
-    local function startDrag(input)
+    local function beginDrag(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
            or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
@@ -1661,16 +1642,15 @@ local function createUI()
         end
     end
 
-    local function doDrag(input)
+    local function moveDrag(input)
         if not dragging then return end
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-           or input.UserInputType == Enum.UserInputType.Touch then
-            local delta = input.Position - dragStart
-            Main.Position = clampPos(UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y
-            ), Main)
-        end
+        if input.UserInputType ~= Enum.UserInputType.MouseMovement
+           and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        local delta = input.Position - dragStart
+        Main.Position = clampPos(UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        ), Main)
     end
 
     local function endDrag(input)
@@ -1680,12 +1660,20 @@ local function createUI()
         end
     end
 
-    TitleBar.InputBegan:Connect(startDrag)
-    TitleBar.InputChanged:Connect(doDrag)
+    TitleBar.InputBegan:Connect(beginDrag)
+    TitleBar.InputChanged:Connect(moveDrag)
     TitleBar.InputEnded:Connect(endDrag)
-    UserInputService.InputChanged:Connect(doDrag)
+    UserInputService.InputChanged:Connect(moveDrag)
+    UserInputService.InputEnded:Connect(endDrag)
 
-    -- ========== TAB SYSTEM ==========
+    -- Prevent title bar children from eating drag touches
+    for _, child in ipairs(TitleBar:GetChildren()) do
+        if child:IsA("TextLabel") or child:IsA("Frame") then
+            child.Active = false
+        end
+    end
+
+    -- TAB SYSTEM
     local Tabs = {}
     local ActiveTabName = nil
 
@@ -1753,7 +1741,7 @@ local function createUI()
         return content
     end
 
-    -- ========== WIDGETS ==========
+    -- WIDGETS
     local function makeSection(parent, title, order)
         local l = Instance.new("TextLabel")
         l.Size = UDim2.new(1, 0, 0, 16)
@@ -2167,7 +2155,6 @@ local function createUI()
         makeButton(GearTab, "◆ " .. weapon.name, function()
             local canGet, missing = checkRequirements(weapon.name)
             if not canGet then
-                -- Try to auto-collect missing items
                 local missingText = table.concat(missing, " · ")
                 notify("Cannot Get " .. weapon.name, missingText, Theme.Crimson, 5)
                 return
@@ -2385,9 +2372,7 @@ local function createUI()
         TeleportService:Teleport(game.PlaceId, LocalPlayer)
     end, Theme.Blue, 11)
 
-    -- ==========================================
     -- LIVE UPDATER
-    -- ==========================================
     task.spawn(function()
         while ScreenGui.Parent do
             pcall(function()
@@ -2451,7 +2436,6 @@ print("[P] Stage 2: UI created")
 pcall(function() initNotifications(GUI) end)
 print("[P] Stage 3: notifications ready")
 
--- Start base loops
 pcall(antiAFKLoop)
 pcall(movementUpdater)
 pcall(infiniteJumpLoop)
@@ -2495,21 +2479,21 @@ end)
 
 task.wait(0.3)
 pcall(function()
-    notify("P | Thanos Simulator", "Wide UI v4.0 loaded", Theme.Purple, 4)
+    notify("P | Thanos Simulator", "Wide UI v4.1 loaded", Theme.Purple, 4)
 end)
 task.wait(0.2)
 pcall(function()
-    notify("Auto-Collect Ready", "Lunar · Celestial · Frost fragments", Theme.Emerald, 4)
+    notify("Full Drag Ready", "Move UI anywhere on screen", Theme.Emerald, 4)
 end)
 task.wait(0.2)
 pcall(function()
-    notify("Auto Upgrade", "Auto-kill for 200k kills", Theme.Gold, 4)
+    notify("Auto-Collect Ready", "Lunar · Celestial · Frost", Theme.Gold, 4)
 end)
 
 pcall(function()
     StarterGui:SetCore("SendNotification", {
         Title = "P | Thanos Simulator",
-        Text = "Wide UI loaded. Drag title bar to move.",
+        Text = "Wide UI loaded. Drag title bar anywhere.",
         Duration = 6,
     })
 end)

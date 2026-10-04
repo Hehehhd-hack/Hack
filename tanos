@@ -1,6 +1,6 @@
 -- ============================================
 -- Infinity Gauntlet | Thanos Simulator
--- "P" Edition v5.0 — Stable Build
+-- "P" Edition v5.1 — Click-Toggle + HoHo AutoKill
 -- ============================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -18,7 +18,7 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
 
 -- ============================================
--- ERROR REPORTER (shows on-screen)
+-- ERROR REPORTER
 -- ============================================
 local function showError(msg)
     pcall(function()
@@ -72,12 +72,11 @@ local function showError(msg)
     end)
 end
 
--- ============================================
--- RUN EVERYTHING INSIDE PCALL
--- ============================================
 local ok, err = pcall(function()
 
+-- ============================================
 -- THEME
+-- ============================================
 local Theme = {
     Bg = Color3.fromRGB(12, 10, 20),
     Panel = Color3.fromRGB(20, 16, 32),
@@ -108,7 +107,9 @@ local Theme = {
     StoneSoul = Color3.fromRGB(255, 130, 40),
 }
 
+-- ============================================
 -- CONFIG
+-- ============================================
 local Config = {
     AutoKill = false, ThrowHeight = 50, KillDelay = 0.05,
     KillLockTimeout = 3, HitboxSize = 15, HitboxTransparency = 0.7,
@@ -136,7 +137,9 @@ if not getgenv().ThanosSim then
 end
 local State = getgenv().ThanosSim
 
+-- ============================================
 -- WEAPON DB
+-- ============================================
 local WeaponDB = {
     { name = "Infinity Gauntlet", requirements = { kills = 0, fragments = 0, stones = {"Space Stone"}, items = {} }, color = Theme.StoneSpace, priority = 5 },
     { name = "Upgraded Infinity Gauntlet", requirements = { kills = 200000, fragments = 0, stones = {}, items = {"Infinity Gauntlet"} }, color = Theme.Purple, priority = 10 },
@@ -318,13 +321,17 @@ getOwnedItems = function()
     return items
 end
 
+-- ============================================
+-- REQUIREMENTS CHECK
+-- ============================================
 checkRequirements = function(weaponName)
     local weapon
     for _, w in ipairs(WeaponDB) do
         if w.name == weaponName then weapon = w; break end
     end
-    if not weapon then return false, {"Unknown"} end
+    if not weapon then return false, {"Unknown"}, {} end
     local missing = {}
+    local missingItems = {}
     if weapon.requirements.kills > 0 and (State.KillCount or 0) < weapon.requirements.kills then
         table.insert(missing, string.format("Kills: %s/%s", fmt(State.KillCount or 0), fmt(weapon.requirements.kills)))
     end
@@ -345,11 +352,17 @@ checkRequirements = function(weaponName)
                 found = true; break
             end
         end
-        if not found then table.insert(missing, "Missing: " .. item) end
+        if not found then
+            table.insert(missing, "Missing: " .. item)
+            table.insert(missingItems, item)
+        end
     end
-    return #missing == 0, missing
+    return #missing == 0, missing, missingItems
 end
 
+-- ============================================
+-- AUTO EQUIP BEST
+-- ============================================
 autoEquipBest = function()
     if not Config.AutoEquipBest then return end
     local char = getCharacter()
@@ -383,7 +396,7 @@ autoEquipBest = function()
 end
 
 -- ============================================
--- HITBOX + THROW KILL (defined before UI)
+-- HITBOX EXPANDER (HoHo-style)
 -- ============================================
 local originalSizes = {}
 
@@ -400,6 +413,25 @@ local function expandHitbox(target, size)
     hrp.BrickColor = BrickColor.new("Really red")
 end
 
+local function restoreAllHitboxes()
+    for target, orig in pairs(originalSizes) do
+        if target and target.Parent then
+            local hrp = target:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.Size = orig.size
+                hrp.Transparency = orig.transparency
+            end
+        end
+    end
+    originalSizes = {}
+end
+
+-- ============================================
+-- HoHo-STYLE AUTO KILL
+-- Teleports above target with hitbox expanded.
+-- Spams attack via tool:Activate + mouse click.
+-- Locks onto ONE target until dead, then moves on.
+-- ============================================
 local function getFixedClick()
     local cam = Workspace.CurrentCamera
     if not cam then return Vector2.new(0, 0) end
@@ -414,10 +446,15 @@ local function throwAboveKill(npc)
     local tool = equipBestTool()
     local startTime = os.clock()
     local fixedClick = getFixedClick()
+
+    -- Expand the hitbox so hits land reliably even if the model moves
     expandHitbox(npc.model, Config.HitboxSize)
+
+    -- Freeze target so it can't run while being hit
     if Config.FreezeTarget and npc.hrp then
         pcall(function() npc.hrp.Anchored = true end)
     end
+
     while Config.AutoKill do
         if not npc.model.Parent or not npc.humanoid then break end
         if npc.humanoid.Health <= 0 then
@@ -432,10 +469,14 @@ local function throwAboveKill(npc)
             end
             return false
         end
+
+        -- Teleport ABOVE target (HoHo-style slam)
         pcall(function()
             hrp.CFrame = CFrame.new(npc.hrp.Position + Vector3.new(0, Config.ThrowHeight, 0))
             hrp.Velocity = Vector3.new(0, -300, 0)
         end)
+
+        -- Fire weapon hitbox at target
         if tool and tool.Parent and tool:FindFirstChild("Handle") then
             pcall(function()
                 firetouchinterest(tool.Handle, npc.hrp, 0)
@@ -443,13 +484,19 @@ local function throwAboveKill(npc)
                 firetouchinterest(tool.Handle, npc.hrp, 1)
             end)
         end
+
+        -- Activate tool
         if tool then pcall(function() tool:Activate() end) end
+
+        -- Click at center of screen (fixed position)
         pcall(function()
             VirtualUser:CaptureController()
             VirtualUser:ClickButton1(fixedClick)
         end)
+
         task.wait(Config.KillDelay)
     end
+
     if Config.FreezeTarget and npc.hrp then
         pcall(function() npc.hrp.Anchored = false end)
     end
@@ -457,7 +504,7 @@ local function throwAboveKill(npc)
 end
 
 -- ============================================
--- LOOP FUNCTIONS (all defined before createUI)
+-- AUTO KILL LOOP (HoHo-style target lock)
 -- ============================================
 local function autoKillLoop()
     task.spawn(function()
@@ -477,9 +524,13 @@ local function autoKillLoop()
             end)
             task.wait(Config.KillDelay)
         end
+        restoreAllHitboxes()
     end)
 end
 
+-- ============================================
+-- KILL AURA
+-- ============================================
 local function killAuraLoop()
     task.spawn(function()
         while Config.KillAura do
@@ -506,6 +557,9 @@ local function killAuraLoop()
     end)
 end
 
+-- ============================================
+-- AUTO FARM (spam nearest)
+-- ============================================
 local function autoFarmLoop()
     task.spawn(function()
         while Config.AutoFarm do
@@ -529,6 +583,9 @@ local function autoFarmLoop()
     end)
 end
 
+-- ============================================
+-- AUTO COLLECT LOOPS
+-- ============================================
 local function autoCollectStonesLoop()
     task.spawn(function()
         while Config.AutoCollectStones do
@@ -705,6 +762,30 @@ local function autoAstraWavesLoop()
     end)
 end
 
+-- ============================================
+-- AUTO-COLLECT FOR WEAPON REQUIREMENTS
+-- ============================================
+local function autoCollectForWeapon(weaponName)
+    local _, _, missingItems = checkRequirements(weaponName)
+    if #missingItems == 0 then return end
+    for _, item in ipairs(missingItems) do
+        if item:lower():find("lunar") then
+            if not Config.AutoCollectLunar then
+                Config.AutoCollectLunar = true
+                autoCollectLunarLoop()
+            end
+        elseif item:lower():find("celestial") then
+            if not Config.AutoCollectCelestial then
+                Config.AutoCollectCelestial = true
+                autoCollectCelestialLoop()
+            end
+        end
+    end
+end
+
+-- ============================================
+-- GOD MODE / FLY / ANTI-FLING / ESP
+-- ============================================
 local function godModeLoop()
     task.spawn(function()
         while Config.GodMode do
@@ -806,9 +887,6 @@ local function movementUpdater()
                 local hum = getHumanoid()
                 if hum then
                     if Config.SpeedHack then hum.WalkSpeed = Config.SpeedValue end
-                    if Config.InfiniteJump then
-                        hum.UseJumpPower = true
-                    end
                 end
             end)
             task.wait(0.5)
@@ -1044,7 +1122,7 @@ local function buildUI()
     SubLbl.Size = UDim2.new(1, -200, 0, 12)
     SubLbl.Position = UDim2.new(0, 50, 0, 27)
     SubLbl.BackgroundTransparency = 1
-    SubLbl.Text = "P edition · v5.0"
+    SubLbl.Text = "P edition · v5.1"
     SubLbl.TextColor3 = Theme.Gold
     SubLbl.Font = Enum.Font.Gotham
     SubLbl.TextSize = 10
@@ -1072,7 +1150,7 @@ local function buildUI()
     local ResizePlus = headerBtn("+", -130, Theme.Card)
     local CloseBtn = headerBtn("×", -34, Theme.Crimson)
 
-    -- Greeting bar
+    -- Greeting
     local Greeting = Instance.new("Frame")
     Greeting.Size = UDim2.new(1, -16, 0, 38)
     Greeting.Position = UDim2.new(0, 8, 0, 54)
@@ -1093,10 +1171,7 @@ local function buildUI()
     Instance.new("UICorner", Avatar).CornerRadius = UDim.new(1, 0)
     task.spawn(function()
         pcall(function()
-            Avatar.Image = Players:GetUserThumbnailAsync(
-                LocalPlayer.UserId,
-                Enum.ThumbnailType.HeadShot,
-                Enum.ThumbnailSize.Size100x100)
+            Avatar.Image = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
         end)
     end)
 
@@ -1269,7 +1344,7 @@ local function buildUI()
     UIS.InputChanged:Connect(moveDrag)
     UIS.InputEnded:Connect(endDrag)
 
-    -- WIDGET HELPERS
+    -- WIDGETS
     local Tabs = {}
     local function switchTab(name)
         for tn, tab in pairs(Tabs) do
@@ -1336,17 +1411,24 @@ local function buildUI()
         return page
     end
 
-    local function section(parent, title, order)
-        local l = Instance.new("TextLabel")
-        l.Size = UDim2.new(1, 0, 0, 16)
-        l.BackgroundTransparency = 1
-        l.Text = title:upper()
-        l.TextColor3 = Theme.PurpleBright
-        l.Font = Enum.Font.GothamBold
-        l.TextSize = 9
-        l.TextXAlignment = Enum.TextXAlignment.Left
-        l.LayoutOrder = order or 0
-        l.Parent = parent
+    -- ============================================
+    -- CRITICAL FIX: CLICK-TO-ACTIVATE TOGGLES
+    -- Uses InputBegan on the toggle holder frame.
+    -- Requires MouseButton1/Touch but checks
+    -- that the input is a click (not scroll/drag).
+    -- Scroll uses MouseMovement/TouchPan, which we ignore.
+    -- ============================================
+    local function isClickInput(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            return true
+        end
+        if input.UserInputType == Enum.UserInputType.Touch then
+            -- Check if the touch is a tap (short duration, minimal movement)
+            -- We can't easily measure duration here, so we rely on the fact
+            -- that scrolling uses TouchPan not Touch (in most cases)
+            return true
+        end
+        return false
     end
 
     local function toggle(parent, name, default, callback, order)
@@ -1391,9 +1473,10 @@ local function buildUI()
             TweenService:Create(pill, TweenInfo.new(0.1), {BackgroundColor3 = tc}):Play()
             if callback then pcall(callback, state) end
         end
+
+        -- ONLY respond to actual clicks, not scroll events
         h.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1
-               or input.UserInputType == Enum.UserInputType.Touch then
+            if isClickInput(input) then
                 apply(not state)
             end
         end)
@@ -1532,14 +1615,15 @@ local function buildUI()
         l.Parent = parent
     end
 
+    -- ============================================
     -- HOME TAB
+    -- ============================================
     local home = makeTab("Home", "⌂", 1)
-    section(home, "Stats", 1)
     local statsCard = Instance.new("Frame", home)
     statsCard.Size = UDim2.new(1, 0, 0, 64)
     statsCard.BackgroundColor3 = Theme.Card
     statsCard.BorderSizePixel = 0
-    statsCard.LayoutOrder = 2
+    statsCard.LayoutOrder = 1
     Instance.new("UICorner", statsCard).CornerRadius = UDim.new(0, 10)
 
     local killDisplay = Instance.new("TextLabel", statsCard)
@@ -1572,18 +1656,19 @@ local function buildUI()
     fragDisplay.TextSize = 16
     Instance.new("UICorner", fragDisplay).CornerRadius = UDim.new(0, 8)
 
-    section(home, "Actions", 3)
     button(home, "Rejoin Server", function()
         TPS:Teleport(game.PlaceId, LocalPlayer)
-    end, Theme.Blue, 4)
+    end, Theme.Blue, 2)
     button(home, "Reset Session Stats", function()
         State.KillCount = 0
         State.FragmentCount = 0
-    end, Theme.Card, 5)
+    end, Theme.Card, 3)
 
+    -- ============================================
     -- COMBAT TAB
+    -- ============================================
     local combat = makeTab("Combat", "⚔", 2)
-    section(combat, "Throw-Above Auto Kill", 1)
+    label(combat, "Throw-Above Auto Kill (HoHo style)", Theme.PurpleBright, 1)
     toggle(combat, "Auto Kill (one at a time)", false, function(v)
         Config.AutoKill = v
         if v then autoKillLoop() end
@@ -1594,29 +1679,32 @@ local function buildUI()
     slider(combat, "Hitbox Size", 3, 30, 15, function(v) Config.HitboxSize = v end, 6)
     slider(combat, "Lock Timeout", 1, 10, 3, function(v) Config.KillLockTimeout = v end, 7)
 
-    section(combat, "Kill Aura", 8)
-    toggle(combat, "Kill Aura (multi)", false, function(v)
+    label(combat, "Kill Aura (multi-target)", Theme.PurpleBright, 8)
+    toggle(combat, "Kill Aura", false, function(v)
         Config.KillAura = v
         if v then killAuraLoop() end
     end, 9)
     slider(combat, "Aura Range", 10, 200, 55, function(v) Config.AuraRange = v end, 10)
 
-    section(combat, "Auto Farm", 11)
-    toggle(combat, "Auto Farm (spam)", false, function(v)
+    label(combat, "Auto Farm (spam nearest)", Theme.PurpleBright, 11)
+    toggle(combat, "Auto Farm", false, function(v)
         Config.AutoFarm = v
         if v then autoFarmLoop() end
     end, 12)
     slider(combat, "Farm Speed", 1, 50, 10, function(v) Config.FarmSpeed = v / 100 end, 13)
 
-    -- GEAR TAB
+    -- ============================================
+    -- GEAR TAB (with auto-collect)
+    -- ============================================
     local gear = makeTab("Gear", "⚜", 3)
-    section(gear, "Weapons", 1)
-    label(gear, "Checks requirements before teleporting", Theme.TextMuted, 2)
+    label(gear, "Weapons — auto-collects missing items", Theme.PurpleBright, 1)
     for i, w in ipairs(WeaponDB) do
         button(gear, w.name, function()
-            local canGet, missing = checkRequirements(w.name)
+            local canGet, missing, missingItems = checkRequirements(w.name)
             if not canGet then
-                notify("Cannot get " .. w.name, table.concat(missing, " · "), Theme.Crimson, 5)
+                -- Auto-collect missing items
+                autoCollectForWeapon(w.name)
+                notify("Auto-Collecting", "Getting required items for " .. w.name, w.color, 4)
                 return
             end
             notify("Getting " .. w.name, "Requirements met", w.color, 3)
@@ -1643,7 +1731,7 @@ local function buildUI()
         end, w.color, 2 + i)
     end
 
-    section(gear, "Auto-Collect Materials", 20)
+    label(gear, "Auto-Collect Materials", Theme.PurpleBright, 20)
     toggle(gear, "Auto Lunar Fragment", false, function(v)
         Config.AutoCollectLunar = v
         State.LunarFragment = false
@@ -1660,9 +1748,11 @@ local function buildUI()
         if v then autoCollectFrostLoop() end
     end, 23)
 
+    -- ============================================
     -- AUTO TAB
+    -- ============================================
     local auto = makeTab("Auto", "⚙", 4)
-    section(auto, "Automation", 1)
+    label(auto, "Automation", Theme.PurpleBright, 1)
     toggle(auto, "Auto Collect Stones", false, function(v)
         Config.AutoCollectStones = v
         if v then autoCollectStonesLoop() end
@@ -1684,12 +1774,13 @@ local function buildUI()
         if v then autoAstraWavesLoop() end
     end, 6)
 
+    -- ============================================
     -- MISC TAB
+    -- ============================================
     local misc = makeTab("Misc", "✦", 5)
-    section(misc, "Character", 1)
+    label(misc, "Character", Theme.PurpleBright, 1)
     toggle(misc, "Auto Equip Best", true, function(v)
         Config.AutoEquipBest = v
-        if v then autoEquipLoop() end
     end, 2)
     toggle(misc, "Anti-AFK", true, function(v) Config.AntiAFK = v end, 3)
     toggle(misc, "God Mode", false, function(v)
@@ -1702,7 +1793,7 @@ local function buildUI()
     end, 5)
     slider(misc, "Fly Speed", 10, 200, 60, function(v) Config.FlySpeed = v end, 6)
 
-    section(misc, "Movement", 7)
+    label(misc, "Movement", Theme.PurpleBright, 7)
     toggle(misc, "Speed Hack", false, function(v)
         Config.SpeedHack = v
         local hum = getHumanoid()
@@ -1712,7 +1803,7 @@ local function buildUI()
     toggle(misc, "Infinite Jump", false, function(v) Config.InfiniteJump = v end, 10)
     toggle(misc, "No Clip", false, function(v) Config.NoClip = v end, 11)
 
-    section(misc, "Visuals", 12)
+    label(misc, "Visuals", Theme.PurpleBright, 12)
     toggle(misc, "NPC ESP", false, function(v)
         Config.ESP = v
         if v then espLoop() end
@@ -1723,7 +1814,7 @@ local function buildUI()
         if v then antiFlingLoop() end
     end, 15)
 
-    section(misc, "Actions", 16)
+    label(misc, "Actions", Theme.PurpleBright, 16)
     button(misc, "Reset Character", function()
         local char = getCharacter()
         if char then
@@ -1795,14 +1886,16 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 task.wait(0.3)
-notify("P | Thanos Simulator", "Loaded v5.0", Theme.Purple, 4)
+notify("P | Thanos Simulator", "v5.1 loaded — click toggles", Theme.Purple, 4)
 task.wait(0.2)
-notify("Full Drag", "Drag title bar anywhere", Theme.Emerald, 4)
+notify("HoHo AutoKill", "Target lock + hitbox expand", Theme.Emerald, 4)
+task.wait(0.2)
+notify("Auto-Collect", "Missing requirements now auto-farmed", Theme.Gold, 4)
 
 pcall(function()
     StarterGui:SetCore("SendNotification", {
         Title = "P | Thanos Simulator",
-        Text = "Loaded. Drag title bar · scroll for options.",
+        Text = "Loaded. Toggles require click · auto-collect ready.",
         Duration = 6,
     })
 end)

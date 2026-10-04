@@ -1,8 +1,7 @@
 -- ============================================
 -- Infinity Gauntlet | Thanos Simulator
--- "P" Edition — Hidden Wide UI · v4.2
+-- "P" Edition — v4.3 (Stable)
 -- Scrollable · Full Drag · Auto-Collect
--- Delta Executor (Mobile) Compatible
 -- ============================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -15,7 +14,6 @@ local Workspace         = game:GetService("Workspace")
 local VirtualUser       = game:GetService("VirtualUser")
 local StarterGui        = game:GetService("StarterGui")
 local Lighting          = game:GetService("Lighting")
-local CoreGui           = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
@@ -25,57 +23,48 @@ pcall(function()
     if identifyexecutor then Executor.Name = identifyexecutor()
     elseif getexecutorname then Executor.Name = getexecutorname()
     elseif KRNL_LOADED then Executor.Name = "KRNL"
-    elseif syn then Executor.Name = "Synapse"
-    end
+    elseif syn then Executor.Name = "Synapse" end
 end)
 pcall(function()
     Executor.Mobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 end)
 
-local getCharacter, getHRP, getHumanoid, teleportTo, getSafeOffset
+local getCharacter, getHRP, getHumanoid, teleportTo
 local isValidNPC, getAllNPCs, getClosestNPC, equipBestTool
 local fireTouch, findObjectByTerms, fmt, formatTime, getOwnedItems
 local checkRequirements, autoEquipBest, notify
-local getNPCsByName, getItemCount, findItem
+local getNPCsByName, findItem
 
 local Theme = {
-    Bg          = Color3.fromRGB(12, 10, 20),
-    BgDeep      = Color3.fromRGB(8, 6, 15),
-    Panel       = Color3.fromRGB(20, 16, 32),
-    PanelLight  = Color3.fromRGB(28, 22, 44),
-    Card        = Color3.fromRGB(34, 26, 52),
-    CardSub     = Color3.fromRGB(42, 34, 62),
-    CardHover   = Color3.fromRGB(52, 42, 76),
-    Border      = Color3.fromRGB(90, 65, 140),
-    BorderDim   = Color3.fromRGB(55, 42, 85),
-
-    Purple      = Color3.fromRGB(155, 85, 255),
-    PurpleDeep  = Color3.fromRGB(80, 20, 160),
-    PurpleMid   = Color3.fromRGB(110, 50, 200),
-    PurpleBright= Color3.fromRGB(185, 130, 255),
-    Gold        = Color3.fromRGB(255, 200, 70),
-    GoldBright  = Color3.fromRGB(255, 230, 130),
-    GoldDim     = Color3.fromRGB(180, 130, 30),
-    Crimson     = Color3.fromRGB(220, 50, 80),
-    CrimsonDim  = Color3.fromRGB(140, 35, 60),
-    Emerald     = Color3.fromRGB(60, 200, 130),
-    EmeraldDim  = Color3.fromRGB(35, 120, 80),
-    Cyan        = Color3.fromRGB(100, 200, 240),
-    Orange      = Color3.fromRGB(255, 135, 55),
-    Pink        = Color3.fromRGB(255, 90, 180),
-    Blue        = Color3.fromRGB(80, 120, 220),
-
-    Text        = Color3.fromRGB(240, 235, 255),
-    TextDim     = Color3.fromRGB(165, 155, 190),
-    TextMuted   = Color3.fromRGB(110, 100, 135),
-    TextGold    = Color3.fromRGB(255, 215, 100),
-
-    StoneSpace   = Color3.fromRGB(120, 80, 255),
+    Bg = Color3.fromRGB(12, 10, 20),
+    Panel = Color3.fromRGB(20, 16, 32),
+    PanelLight = Color3.fromRGB(28, 22, 44),
+    Card = Color3.fromRGB(34, 26, 52),
+    CardSub = Color3.fromRGB(42, 34, 62),
+    CardHover = Color3.fromRGB(52, 42, 76),
+    Border = Color3.fromRGB(90, 65, 140),
+    BorderDim = Color3.fromRGB(55, 42, 85),
+    Purple = Color3.fromRGB(155, 85, 255),
+    PurpleDeep = Color3.fromRGB(80, 20, 160),
+    PurpleBright = Color3.fromRGB(185, 130, 255),
+    Gold = Color3.fromRGB(255, 200, 70),
+    GoldBright = Color3.fromRGB(255, 230, 130),
+    Crimson = Color3.fromRGB(220, 50, 80),
+    Emerald = Color3.fromRGB(60, 200, 130),
+    Cyan = Color3.fromRGB(100, 200, 240),
+    Orange = Color3.fromRGB(255, 135, 55),
+    Pink = Color3.fromRGB(255, 90, 180),
+    Blue = Color3.fromRGB(80, 120, 220),
+    Text = Color3.fromRGB(240, 235, 255),
+    TextDim = Color3.fromRGB(165, 155, 190),
+    TextMuted = Color3.fromRGB(110, 100, 135),
+    TextGold = Color3.fromRGB(255, 215, 100),
+    StoneSpace = Color3.fromRGB(120, 80, 255),
     StoneReality = Color3.fromRGB(220, 40, 60),
-    StoneTime    = Color3.fromRGB(0, 200, 100),
-    StoneMind    = Color3.fromRGB(255, 210, 40),
-    StonePower   = Color3.fromRGB(180, 60, 220),
-    StoneSoul    = Color3.fromRGB(255, 130, 40),
+    StoneTime = Color3.fromRGB(0, 200, 100),
+    StoneMind = Color3.fromRGB(255, 210, 40),
+    StonePower = Color3.fromRGB(180, 60, 220),
+    StoneSoul = Color3.fromRGB(255, 130, 40),
 }
 
 local Config = {
@@ -83,56 +72,43 @@ local Config = {
     KillDelay = 0.05, KillLockTimeout = 3, HitboxSize = 15,
     HitboxTransparency = 0.7, FreezeTarget = true,
     KillAura = false, AuraRange = 55, AuraSpeed = 0.08,
-
     AutoFarm = false, FarmSpeed = 0.1, AutoSoulFarm = false,
-
     AutoCollectStones = false, AutoPowerStone = false,
     AutoCollectFrost = false, AutoCollectLunar = false,
     AutoCollectCelestial = false, StonesCollected = {},
-
     AutoUpgradeGauntlet = false, AutoKillForUpgrade = false,
-
     AutoTemplarFarm = false, AutoForgeActivate = false,
     AutoAstraWaves = false, AutoDisintegrate = false,
-
     AntiAFK = true, SpeedHack = false, SpeedValue = 50,
     JumpPower = false, JumpValue = 100, ESP = false,
     ESPColor = "Crimson", FullBright = false, NoClip = false,
     InfiniteJump = false,
-
     GodMode = false, Fly = false, FlySpeed = 60,
     AntiFling = false, AutoParry = false, AutoEquipBest = true,
-
-    KillCount = 0, FragmentCount = 0, SessionStart = os.time(),
-    TeleportCount = 0, DPSWindow = {}, CurrentDPS = 0, DPSPeak = 0,
-
+    KillCount = 0, FragmentCount = 0, DPSWindow = {}, CurrentDPS = 0,
     UIScaleValue = 1, Collapsed = false, CurrentTarget = nil,
-    LastKillTime = 0, FixedMousePos = Vector2.new(0, 0),
     FixedMouseLock = false, ActivePage = "Home",
 }
 
 if not getgenv().ThanosSim then
     getgenv().ThanosSim = {
         KillCount = 0, SessionKills = 0, FragmentCount = 0,
-        AstraWave = 0, StonesCollected = {},
-        InitTimestamp = os.time(), WeaponsOwned = {},
-        FrostFragments = 0, LunarFragment = false,
-        CelestialFragment = false, HeartOfYmir = false,
-        CrownOfBlackFire = false,
+        AstraWave = 0, StonesCollected = {}, InitTimestamp = os.time(),
+        FrostFragments = 0, LunarFragment = false, CelestialFragment = false,
     }
 end
 local State = getgenv().ThanosSim
 
 local WeaponDB = {
-    { name = "Infinity Gauntlet", requirements = { kills = 0, fragments = 0, stones = {"Space Stone"}, items = {} }, description = "Base gauntlet.", color = Theme.StoneSpace, autoEquipPriority = 5 },
-    { name = "Upgraded Infinity Gauntlet", requirements = { kills = 200000, fragments = 0, stones = {}, items = {"Infinity Gauntlet"} }, description = "200k kills.", color = Theme.Purple, autoEquipPriority = 10 },
-    { name = "Stormbreaker", requirements = { kills = 750, fragments = 100, stones = {}, items = {} }, description = "750 kills + 100 frags.", color = Theme.Gold, autoEquipPriority = 7 },
-    { name = "Mjolnir", requirements = { kills = 0, fragments = 350, stones = {}, items = {"Stormbreaker"} }, description = "350 fragments.", color = Theme.Cyan, autoEquipPriority = 8 },
-    { name = "Surtur's Sword", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Heart of Ymir", "Hadron Enforcer", "Crown of Black Fire"} }, description = "3 items needed.", color = Theme.Crimson, autoEquipPriority = 9 },
-    { name = "Hadron Enforcer", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Lunar Fragment", "Celestial Fragment"} }, description = "Lunar + Celestial frag.", color = Theme.Emerald, autoEquipPriority = 6 },
-    { name = "Cosmi-Rod", requirements = { kills = 0, fragments = 0, stones = {}, items = {} }, description = "Kill Servant of Celestial.", color = Theme.Orange, autoEquipPriority = 4 },
-    { name = "Secret Weapon", requirements = { kills = 800, fragments = 0, stones = {}, items = {} }, description = "800 kills.", color = Theme.Pink, autoEquipPriority = 3 },
-    { name = "Mechanical Gloves", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Infinity Gauntlet"} }, description = "Classic Snap on Doom.", color = Theme.Blue, autoEquipPriority = 2 },
+    { name = "Infinity Gauntlet", requirements = { kills = 0, fragments = 0, stones = {"Space Stone"}, items = {} }, color = Theme.StoneSpace, autoEquipPriority = 5 },
+    { name = "Upgraded Infinity Gauntlet", requirements = { kills = 200000, fragments = 0, stones = {}, items = {"Infinity Gauntlet"} }, color = Theme.Purple, autoEquipPriority = 10 },
+    { name = "Stormbreaker", requirements = { kills = 750, fragments = 100, stones = {}, items = {} }, color = Theme.Gold, autoEquipPriority = 7 },
+    { name = "Mjolnir", requirements = { kills = 0, fragments = 350, stones = {}, items = {"Stormbreaker"} }, color = Theme.Cyan, autoEquipPriority = 8 },
+    { name = "Surtur's Sword", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Heart of Ymir", "Hadron Enforcer", "Crown of Black Fire"} }, color = Theme.Crimson, autoEquipPriority = 9 },
+    { name = "Hadron Enforcer", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Lunar Fragment", "Celestial Fragment"} }, color = Theme.Emerald, autoEquipPriority = 6 },
+    { name = "Cosmi-Rod", requirements = { kills = 0, fragments = 0, stones = {}, items = {} }, color = Theme.Orange, autoEquipPriority = 4 },
+    { name = "Secret Weapon", requirements = { kills = 800, fragments = 0, stones = {}, items = {} }, color = Theme.Pink, autoEquipPriority = 3 },
+    { name = "Mechanical Gloves", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Infinity Gauntlet"} }, color = Theme.Blue, autoEquipPriority = 2 },
 }
 
 getCharacter = function()
@@ -161,12 +137,7 @@ teleportTo = function(position)
         if typeof(position) == "CFrame" then hrp.CFrame = position
         elseif typeof(position) == "Vector3" then hrp.CFrame = CFrame.new(position) end
     end)
-    if ok then Config.TeleportCount = Config.TeleportCount + 1 end
     return ok
-end
-
-getSafeOffset = function()
-    return CFrame.new(math.random(-20, 20) / 10, 0, math.random(-20, 20) / 10)
 end
 
 isValidNPC = function(obj)
@@ -206,7 +177,7 @@ end
 
 getClosestNPC = function(filterFn)
     local hrp = getHRP()
-    if not hrp then return nil, math.huge end
+    if not hrp then return nil end
     local closest, closestDist = nil, math.huge
     local myPos = hrp.Position
     for _, npc in ipairs(getAllNPCs()) do
@@ -214,7 +185,7 @@ getClosestNPC = function(filterFn)
         local dist = (npc.hrp.Position - myPos).Magnitude
         if dist < closestDist then closestDist = dist; closest = npc end
     end
-    return closest, closestDist
+    return closest
 end
 
 equipBestTool = function()
@@ -277,17 +248,6 @@ findItem = function(itemName)
     return nil
 end
 
-getItemCount = function(itemName)
-    local count = 0
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if backpack then
-        for _, obj in ipairs(backpack:GetChildren()) do
-            if obj.Name:lower():find(itemName:lower()) then count = count + 1 end
-        end
-    end
-    return count
-end
-
 fmt = function(n)
     if n >= 1e9 then return string.format("%.1fB", n / 1e9) end
     if n >= 1e6 then return string.format("%.1fM", n / 1e6) end
@@ -327,28 +287,28 @@ checkRequirements = function(weaponName)
     if not weapon then return false, {"Unknown weapon"} end
     local missing = {}
     if weapon.requirements.kills > 0 then
-        local currentKills = State.KillCount or 0
-        if currentKills < weapon.requirements.kills then
-            table.insert(missing, string.format("Kills: %s / %s", fmt(currentKills), fmt(weapon.requirements.kills)))
+        local c = State.KillCount or 0
+        if c < weapon.requirements.kills then
+            table.insert(missing, string.format("Kills: %s / %s", fmt(c), fmt(weapon.requirements.kills)))
         end
     end
     if weapon.requirements.fragments > 0 then
-        local currentFrags = State.FragmentCount or 0
-        if currentFrags < weapon.requirements.fragments then
-            table.insert(missing, string.format("Frags: %s / %s", fmt(currentFrags), fmt(weapon.requirements.fragments)))
+        local c = State.FragmentCount or 0
+        if c < weapon.requirements.fragments then
+            table.insert(missing, string.format("Frags: %s / %s", fmt(c), fmt(weapon.requirements.fragments)))
         end
     end
     for _, stone in ipairs(weapon.requirements.stones or {}) do
-        local stoneKey = stone:gsub(" Stone", "")
-        if not Config.StonesCollected[stoneKey] and not State.StonesCollected[stoneKey] then
+        local key = stone:gsub(" Stone", "")
+        if not Config.StonesCollected[key] and not State.StonesCollected[key] then
             table.insert(missing, "Missing: " .. stone)
         end
     end
-    local ownedItems = getOwnedItems()
+    local owned = getOwnedItems()
     for _, item in ipairs(weapon.requirements.items or {}) do
         local found = false
-        for _, owned in ipairs(ownedItems) do
-            if owned:lower():find(item:lower()) or item:lower():find(owned:lower()) then
+        for _, o in ipairs(owned) do
+            if o:lower():find(item:lower()) or item:lower():find(o:lower()) then
                 found = true; break
             end
         end
@@ -365,25 +325,24 @@ autoEquipBest = function()
     if not hum then return end
     local bestPriority = -1
     local bestTool = nil
-    local function checkTool(tool)
-        for _, weapon in ipairs(WeaponDB) do
-            if tool.Name:lower():find(weapon.name:lower()) or weapon.name:lower():find(tool.Name:lower()) then
-                if weapon.autoEquipPriority > bestPriority then
-                    bestPriority = weapon.autoEquipPriority
-                    bestTool = tool
+    local function check(tool)
+        for _, w in ipairs(WeaponDB) do
+            if tool.Name:lower():find(w.name:lower()) or w.name:lower():find(tool.Name:lower()) then
+                if w.autoEquipPriority > bestPriority then
+                    bestPriority = w.autoEquipPriority; bestTool = tool
                 end
                 return
             end
         end
         if bestPriority < 1 then bestPriority = 1; bestTool = tool end
     end
-    for _, obj in ipairs(char:GetChildren()) do
-        if obj:IsA("Tool") then checkTool(obj) end
+    for _, o in ipairs(char:GetChildren()) do
+        if o:IsA("Tool") then check(o) end
     end
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if backpack then
-        for _, obj in ipairs(backpack:GetChildren()) do
-            if obj:IsA("Tool") then checkTool(obj) end
+    local bp = LocalPlayer:FindFirstChild("Backpack")
+    if bp then
+        for _, o in ipairs(bp:GetChildren()) do
+            if o:IsA("Tool") then check(o) end
         end
     end
     if bestTool and bestTool.Parent then
@@ -406,7 +365,7 @@ local function expandHitbox(target, size)
     local hrp = target:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     if not originalSizes[target] then
-        originalSizes[target] = { size = hrp.Size, transparency = hrp.Transparency, cancollide = hrp.CanCollide }
+        originalSizes[target] = { size = hrp.Size, transparency = hrp.Transparency }
     end
     hrp.Size = Vector3.new(size, size, size)
     hrp.Transparency = Config.HitboxTransparency
@@ -414,25 +373,24 @@ local function expandHitbox(target, size)
     hrp.BrickColor = BrickColor.new("Really red")
 end
 
-local function getFixedMouseClick()
+local function getFixedClick()
     local cam = Workspace.CurrentCamera
     if not cam then return Vector2.new(0, 0) end
-    local vp = cam.ViewportSize
-    return Vector2.new(vp.X / 2, vp.Y / 2)
+    return Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
 end
 
 local function lockClickPosition()
-    if Config.FixedMouseLock then return end
     Config.FixedMouseLock = true
 end
 
 local function throwAboveKill(npc)
     if not npc or not npc.model or not npc.model.Parent then return false end
     if not npc.humanoid or npc.humanoid.Health <= 0 then return true end
-    local hrp = getHRP(); if not hrp then return false end
+    local hrp = getHRP()
+    if not hrp then return false end
     local tool = equipBestTool()
     local startTime = os.clock()
-    local fixedClick = getFixedMouseClick()
+    local fixedClick = getFixedClick()
     expandHitbox(npc.model, Config.HitboxSize)
     if Config.FreezeTarget and npc.hrp then
         pcall(function() npc.hrp.Anchored = true end)
@@ -485,10 +443,8 @@ local function autoKillLoop()
                 local target = getClosestNPC()
                 if target then
                     Config.CurrentTarget = target
-                    local killed = throwAboveKill(target)
-                    if killed then
+                    if throwAboveKill(target) then
                         State.KillCount = (State.KillCount or 0) + 1
-                        State.SessionKills = (State.SessionKills or 0) + 1
                     end
                     Config.CurrentTarget = nil
                     task.wait(0.05)
@@ -562,9 +518,6 @@ local function soulFarmLoop()
                         local tool = equipBestTool()
                         if tool then pcall(function() tool:Activate() end) end
                         pcall(function() LocalPlayer:GetMouse() mouse1click() end)
-                        if npc.humanoid.Health <= 0 then
-                            State.KillCount = (State.KillCount or 0) + 1
-                        end
                     end
                 end
             end)
@@ -640,11 +593,9 @@ local function autoCollectLunarLoop()
                 if State.LunarFragment then return end
                 local lunarNPCs = getNPCsByName("lunar")
                 if #lunarNPCs == 0 then lunarNPCs = getNPCsByName("npc 2") end
-                if #lunarNPCs > 0 then
-                    for _, npc in ipairs(lunarNPCs) do
-                        if not Config.AutoCollectLunar then break end
-                        throwAboveKill(npc)
-                    end
+                for _, npc in ipairs(lunarNPCs) do
+                    if not Config.AutoCollectLunar then break end
+                    throwAboveKill(npc)
                 end
             end)
             task.wait(0.5)
@@ -657,7 +608,7 @@ local function autoCollectCelestialLoop()
         while Config.AutoCollectCelestial do
             pcall(function()
                 if State.CelestialFragment then return end
-                local rock = findObjectByTerms({"rock", "frozen", "celestial rock"})
+                local rock = findObjectByTerms({"rock", "frozen"})
                 if rock then
                     local part = rock:IsA("Model") and (rock:FindFirstChild("Handle") or rock:FindFirstChildWhichIsA("BasePart")) or rock
                     if part then
@@ -667,11 +618,8 @@ local function autoCollectCelestialLoop()
                             task.wait(0.5)
                             local casket = findItem("casket")
                             if casket then
-                                local char = getCharacter()
-                                if char then
-                                    local hum = char:FindFirstChildOfClass("Humanoid")
-                                    if hum then pcall(function() hum:EquipTool(casket) end) end
-                                end
+                                local hum = getHumanoid()
+                                if hum then pcall(function() hum:EquipTool(casket) end) end
                                 task.wait(0.3)
                                 pcall(function()
                                     VirtualUser:CaptureController()
@@ -679,24 +627,6 @@ local function autoCollectCelestialLoop()
                                 end)
                             end
                             task.wait(1)
-                            local cosmi = findItem("cosmi")
-                            if cosmi then
-                                local char = getCharacter()
-                                if char then
-                                    local hum = char:FindFirstChildOfClass("Humanoid")
-                                    if hum then pcall(function() hum:EquipTool(cosmi) end) end
-                                end
-                                task.wait(0.3)
-                                pcall(function()
-                                    VirtualUser:CaptureController()
-                                    VirtualUser:ClickButton1(Vector2.new(0, 0))
-                                end)
-                            end
-                            task.wait(1)
-                            pcall(function()
-                                VirtualUser:CaptureController()
-                                VirtualUser:ClickButton1(Vector2.new(0, 0))
-                            end)
                         end
                     end
                 end
@@ -713,12 +643,10 @@ local function autoCollectFrostLoop()
                 if (State.FrostFragments or 0) >= 8 then return end
                 local presentNPCs = getNPCsByName("present 3")
                 if #presentNPCs == 0 then presentNPCs = getNPCsByName("present") end
-                if #presentNPCs > 0 then
-                    for _, npc in ipairs(presentNPCs) do
-                        if not Config.AutoCollectFrost then break end
-                        throwAboveKill(npc)
-                        State.FrostFragments = (State.FrostFragments or 0) + 1
-                    end
+                for _, npc in ipairs(presentNPCs) do
+                    if not Config.AutoCollectFrost then break end
+                    throwAboveKill(npc)
+                    State.FrostFragments = (State.FrostFragments or 0) + 1
                 end
             end)
             task.wait(0.5)
@@ -752,14 +680,9 @@ local function autoKillForUpgradeLoop()
     task.spawn(function()
         while Config.AutoKillForUpgrade do
             pcall(function()
-                local requiredKills = 200000
-                local currentKills = State.KillCount or 0
-                if currentKills >= requiredKills then
+                if (State.KillCount or 0) >= 200000 then
                     Config.AutoUpgradeGauntlet = true
                     Config.AutoKillForUpgrade = false
-                    pcall(function()
-                        notify("Upgrade Ready", "200k kills reached. Upgrading...", Theme.Emerald, 5)
-                    end)
                     return
                 end
                 local target = getClosestNPC()
@@ -792,7 +715,7 @@ local function autoForgeLoop()
             pcall(function()
                 local hrp = getHRP()
                 if hrp then
-                    local obj = findObjectByTerms({"forge", "sacrifice", "summon"})
+                    local obj = findObjectByTerms({"forge", "sacrifice"})
                     if obj then
                         local part = obj:IsA("Model") and (obj:FindFirstChild("Handle") or obj:FindFirstChildWhichIsA("BasePart")) or obj
                         if part then
@@ -870,20 +793,17 @@ local function flyLoop()
                     end
                     local moveDir = Vector3.new(0, 0, 0)
                     local cam = Workspace.CurrentCamera
-                    if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
+                    if cam then
+                        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
+                    end
                     if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
                     bv.Velocity = moveDir * Config.FlySpeed
                 end
             end)
             task.wait(0.05)
-        end
-        local char = getCharacter()
-        if char then
-            local bv = char:FindFirstChild("P_FlyVel")
-            if bv then bv:Destroy() end
         end
     end)
 end
@@ -927,26 +847,21 @@ local function espLoop()
             pcall(function()
                 for _, npc in ipairs(getAllNPCs()) do
                     if npc.model and not npc.model:FindFirstChild("P_ESP") then
-                        local espColor = Theme.Crimson
-                        if Config.ESPColor == "Emerald" then espColor = Theme.Emerald
-                        elseif Config.ESPColor == "Cyan" then espColor = Theme.Cyan
-                        elseif Config.ESPColor == "Gold" then espColor = Theme.Gold
-                        elseif Config.ESPColor == "Purple" then espColor = Theme.Purple
-                        end
+                        local c = Theme.Crimson
+                        if Config.ESPColor == "Emerald" then c = Theme.Emerald
+                        elseif Config.ESPColor == "Cyan" then c = Theme.Cyan
+                        elseif Config.ESPColor == "Gold" then c = Theme.Gold
+                        elseif Config.ESPColor == "Purple" then c = Theme.Purple end
                         local hl = Instance.new("Highlight")
                         hl.Name = "P_ESP"
-                        hl.FillColor = espColor
+                        hl.FillColor = c
                         hl.FillTransparency = 0.55
-                        hl.OutlineColor = espColor
-                        hl.OutlineTransparency = 0
+                        hl.OutlineColor = c
                         hl.Parent = npc.model
                     end
                 end
             end)
             task.wait(0.5)
-        end
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("Highlight") and obj.Name == "P_ESP" then obj:Destroy() end
         end
     end)
 end
@@ -1001,7 +916,6 @@ local function fullBrightLoop()
                     Lighting.OutdoorAmbient = Color3.fromRGB(180, 180, 180)
                     Lighting.Brightness = 3
                     Lighting.ClockTime = 14
-                    Lighting.FogEnd = 100000
                 end)
             end
             task.wait(1)
@@ -1028,7 +942,6 @@ local function noClipLoop()
 end
 
 local NotificationFrame = nil
-
 local function initNotifications(screenGui)
     NotificationFrame = Instance.new("Frame")
     NotificationFrame.Name = "Notifications"
@@ -1045,7 +958,6 @@ notify = function(title, text, color, duration)
     if not NotificationFrame then return end
     color = color or Theme.Purple
     duration = duration or 3
-
     local card = Instance.new("Frame")
     card.Size = UDim2.new(1, 0, 0, 48)
     card.Position = UDim2.new(1, 30, 0, 0)
@@ -1053,43 +965,38 @@ notify = function(title, text, color, duration)
     card.BorderSizePixel = 0
     card.Parent = NotificationFrame
     Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
-    local cStroke = Instance.new("UIStroke", card)
-    cStroke.Color = color
-    cStroke.Thickness = 1.5
-    cStroke.Transparency = 0.2
-
+    local cs = Instance.new("UIStroke", card)
+    cs.Color = color
+    cs.Thickness = 1.5
+    cs.Transparency = 0.2
     local accent = Instance.new("Frame", card)
     accent.Size = UDim2.new(0, 3, 1, -12)
     accent.Position = UDim2.new(0, 6, 0, 6)
     accent.BackgroundColor3 = color
     accent.BorderSizePixel = 0
     Instance.new("UICorner", accent).CornerRadius = UDim.new(1, 0)
-
-    local titleLbl = Instance.new("TextLabel", card)
-    titleLbl.Size = UDim2.new(1, -50, 0, 16)
-    titleLbl.Position = UDim2.new(0, 16, 0, 6)
-    titleLbl.BackgroundTransparency = 1
-    titleLbl.Text = title
-    titleLbl.TextColor3 = color
-    titleLbl.Font = Enum.Font.GothamBold
-    titleLbl.TextSize = 11
-    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-
-    local textLbl = Instance.new("TextLabel", card)
-    textLbl.Size = UDim2.new(1, -50, 0, 22)
-    textLbl.Position = UDim2.new(0, 16, 0, 22)
-    textLbl.BackgroundTransparency = 1
-    textLbl.Text = text
-    textLbl.TextColor3 = Theme.TextDim
-    textLbl.Font = Enum.Font.Gotham
-    textLbl.TextSize = 9
-    textLbl.TextXAlignment = Enum.TextXAlignment.Left
-    textLbl.TextWrapped = true
-
+    local tl = Instance.new("TextLabel", card)
+    tl.Size = UDim2.new(1, -50, 0, 16)
+    tl.Position = UDim2.new(0, 16, 0, 6)
+    tl.BackgroundTransparency = 1
+    tl.Text = title
+    tl.TextColor3 = color
+    tl.Font = Enum.Font.GothamBold
+    tl.TextSize = 11
+    tl.TextXAlignment = Enum.TextXAlignment.Left
+    local txl = Instance.new("TextLabel", card)
+    txl.Size = UDim2.new(1, -50, 0, 22)
+    txl.Position = UDim2.new(0, 16, 0, 22)
+    txl.BackgroundTransparency = 1
+    txl.Text = text
+    txl.TextColor3 = Theme.TextDim
+    txl.Font = Enum.Font.Gotham
+    txl.TextSize = 9
+    txl.TextXAlignment = Enum.TextXAlignment.Left
+    txl.TextWrapped = true
     TweenService:Create(card, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
         Position = UDim2.new(0, 0, 0, 0),
     }):Play()
-
     task.delay(duration, function()
         TweenService:Create(card, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
             Position = UDim2.new(1, 30, 0, 0),
@@ -1101,29 +1008,21 @@ notify = function(title, text, color, duration)
 end
 
 -- ============================================
--- UI BUILD
+-- UI
 -- ============================================
 local function createUI()
     pcall(function()
         local old = PlayerGui:FindFirstChild("P_ThanosSim")
         if old then old:Destroy() end
     end)
-    pcall(function()
-        local oldCore = CoreGui:FindFirstChild("P_ThanosSim")
-        if oldCore then oldCore:Destroy() end
-    end)
-
-    local guiParent = PlayerGui
-    pcall(function() if gethui then guiParent = gethui() end end)
 
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "P_ThanosSim"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.IgnoreGuiInset = true
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    ScreenGui.Parent = guiParent
+    ScreenGui.Parent = PlayerGui  -- always PlayerGui, safest
 
-    -- Floating reopen
     local OpenBtn = Instance.new("TextButton")
     OpenBtn.Size = UDim2.new(0, 40, 0, 40)
     OpenBtn.Position = UDim2.new(0, 12, 0.5, -20)
@@ -1135,11 +1034,10 @@ local function createUI()
     OpenBtn.Visible = false
     OpenBtn.Parent = ScreenGui
     Instance.new("UICorner", OpenBtn).CornerRadius = UDim.new(0, 13)
-    local obStroke = Instance.new("UIStroke", OpenBtn)
-    obStroke.Color = Theme.Purple
-    obStroke.Thickness = 2
+    local obs = Instance.new("UIStroke", OpenBtn)
+    obs.Color = Theme.Purple
+    obs.Thickness = 2
 
-    -- MAIN — pure offset positioning for clean drag
     local Main = Instance.new("Frame")
     Main.Name = "Main"
     Main.Size = UDim2.new(0, 560, 0, 360)
@@ -1150,15 +1048,13 @@ local function createUI()
     Main.ClipsDescendants = true
     Main.Parent = ScreenGui
     Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 16)
-
-    local mStroke = Instance.new("UIStroke", Main)
-    mStroke.Color = Theme.Border
-    mStroke.Thickness = 1.5
-    mStroke.Transparency = 0.2
-
-    local mGrad = Instance.new("UIGradient", Main)
-    mGrad.Color = ColorSequence.new(Theme.Bg, Theme.Panel)
-    mGrad.Rotation = 90
+    local ms = Instance.new("UIStroke", Main)
+    ms.Color = Theme.Border
+    ms.Thickness = 1.5
+    ms.Transparency = 0.2
+    local mg = Instance.new("UIGradient", Main)
+    mg.Color = ColorSequence.new(Theme.Bg, Theme.Panel)
+    mg.Rotation = 90
 
     local UIScale = Instance.new("UIScale")
     UIScale.Scale = 1
@@ -1172,41 +1068,37 @@ local function createUI()
     TitleBar.BorderSizePixel = 0
     TitleBar.Parent = Main
     Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 16)
-    local tCover = Instance.new("Frame")
-    tCover.Size = UDim2.new(1, 0, 0, 14)
-    tCover.Position = UDim2.new(0, 0, 1, -14)
-    tCover.BackgroundColor3 = Theme.Panel
-    tCover.BorderSizePixel = 0
-    tCover.Parent = TitleBar
-
-    local tGrad = Instance.new("UIGradient", TitleBar)
-    tGrad.Color = ColorSequence.new(Theme.PurpleDeep, Theme.Panel)
-    tGrad.Rotation = 0
+    local tc = Instance.new("Frame")
+    tc.Size = UDim2.new(1, 0, 0, 14)
+    tc.Position = UDim2.new(0, 0, 1, -14)
+    tc.BackgroundColor3 = Theme.Panel
+    tc.BorderSizePixel = 0
+    tc.Parent = TitleBar
+    local tg = Instance.new("UIGradient", TitleBar)
+    tg.Color = ColorSequence.new(Theme.PurpleDeep, Theme.Panel)
+    tg.Rotation = 0
 
     local LogoHolder = Instance.new("Frame")
     LogoHolder.Size = UDim2.new(0, 28, 0, 28)
     LogoHolder.Position = UDim2.new(0, 14, 0.5, -14)
     LogoHolder.BackgroundTransparency = 1
     LogoHolder.Parent = TitleBar
-
     local LogoMoon = Instance.new("Frame")
     LogoMoon.Size = UDim2.new(1, 0, 1, 0)
     LogoMoon.BackgroundColor3 = Color3.fromRGB(180, 220, 255)
     LogoMoon.BorderSizePixel = 0
     LogoMoon.Parent = LogoHolder
     Instance.new("UICorner", LogoMoon).CornerRadius = UDim.new(1, 0)
-    local lgGrad = Instance.new("UIGradient", LogoMoon)
-    lgGrad.Color = ColorSequence.new(Color3.fromRGB(160, 210, 255), Color3.fromRGB(120, 150, 240))
-    lgGrad.Rotation = 45
-
+    local lgg = Instance.new("UIGradient", LogoMoon)
+    lgg.Color = ColorSequence.new(Color3.fromRGB(160, 210, 255), Color3.fromRGB(120, 150, 240))
+    lgg.Rotation = 45
     local LogoCut = Instance.new("Frame")
     LogoCut.Size = UDim2.new(0.7, 0, 0.85, 0)
-    LogoCutImage.Position = UDim2.newLabel(0.35, ")
-   0, 0.05, 0)
+    LogoCut.Position = UDim2.new(0.35, 0, 0.05, 0)
     LogoCut.BackgroundColor3 = Theme.Panel
-    LogoCut.B AvatarorderSizePixel = 0
+    LogoCut.BorderSizePixel = 0
     LogoCut.Parent = LogoHolder
-    Instance.Size.new("UICorner", LogoCut).CornerRadius = UDim.new(1, 0)
+    Instance.new("UICorner", LogoCut).CornerRadius = UDim.new(1, 0)
 
     local TitleLbl = Instance.new("TextLabel")
     TitleLbl.Size = UDim2.new(1, -200, 0, 18)
@@ -1217,17 +1109,19 @@ local function createUI()
     TitleLbl.Font = Enum.Font.GothamBold
     TitleLbl.TextSize = 14
     TitleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLbl.Active = false
     TitleLbl.Parent = TitleBar
 
     local SubLbl = Instance.new("TextLabel")
     SubLbl.Size = UDim2.new(1, -200, 0, 12)
     SubLbl.Position = UDim2.new(0, 50, 0, 27)
     SubLbl.BackgroundTransparency = 1
-    SubLbl.Text = "P edition · v4.2 · scroll"
+    SubLbl.Text = "P edition · v4.3"
     SubLbl.TextColor3 = Theme.Gold
     SubLbl.Font = Enum.Font.Gotham
     SubLbl.TextSize = 10
     SubLbl.TextXAlignment = Enum.TextXAlignment.Left
+    SubLbl.Active = false
     SubLbl.Parent = TitleBar
 
     local function headerBtn(icon, xOff, bg)
@@ -1236,7 +1130,7 @@ local function createUI()
         b.Position = UDim2.new(1, xOff, 0.5, -13)
         b.BackgroundColor3 = bg
         b.Text = icon
-        b.TextColor3 = Color3.fromRGB(255,255,255)
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
         b.Font = Enum.Font.GothamBold
         b.TextSize = 13
         b.AutoButtonColor = false
@@ -1250,7 +1144,7 @@ local function createUI()
     local ResizePlus = headerBtn("+", -130, Theme.Card)
     local CloseBtn = headerBtn("×", -34, Theme.Crimson)
 
-    -- GREETING BAR
+    -- GREETING
     local GreetingBar = Instance.new("Frame")
     GreetingBar.Size = UDim2.new(1, -16, 0, 38)
     GreetingBar.Position = UDim2.new(0, 8, 0, 54)
@@ -1258,34 +1152,28 @@ local function createUI()
     GreetingBar.BorderSizePixel = 0
     GreetingBar.Parent = Main
     Instance.new("UICorner", GreetingBar).CornerRadius = UDim.new(0, 10)
-    local gGrad = Instance.new("UIGradient", GreetingBar)
-    gGrad.Color = ColorSequence.new(Theme.Card, Theme.Panel)
-    gGrad.Rotation = 90
+    local gg = Instance.new("UIGradient", GreetingBar)
+    gg.Color = ColorSequence.new(Theme.Card, Theme.Panel)
+    gg.Rotation = 90
 
-    local Avatar = Instance.new(" = UDim2.new(0, 26, 0, 26)
+    local Avatar = Instance.new("ImageLabel")
+    Avatar.Size = UDim2.new(0, 26, 0, 26)
     Avatar.Position = UDim2.new(0, 8, 0.5, -13)
     Avatar.BackgroundColor3 = Theme.CardSub
     Avatar.BorderSizePixel = 0
-    Avatar.Image = ""
     Avatar.Parent = GreetingBar
     Instance.new("UICorner", Avatar).CornerRadius = UDim.new(1, 0)
-
     task.spawn(function()
         pcall(function()
-            local url = Players:GetUserThumbnailAsync(
-                LocalPlayer.UserId,
-                Enum.ThumbnailType.HeadShot,
-                Enum.ThumbnailSize.Size100x100
-            )
-            Avatar.Image = url
+            Avatar.Image = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
         end)
     end)
 
     local HelloLbl = Instance.new("TextLabel")
-    HelloLbl.Size = UDim2.new(1, -180, 0, 14)
+    HelloLbl.Size = UDim2.new(1, -60, 0, 14)
     HelloLbl.Position = UDim2.new(0, 42, 0, 6)
     HelloLbl.BackgroundTransparency = 1
-    HelloLbl.Text = "Hello, " .. LocalPlayer.DisplayName .. "  ·  @" .. LocalPlayer.Name
+    HelloLbl.Text = "Hello, " .. LocalPlayer.DisplayName
     HelloLbl.TextColor3 = Theme.Text
     HelloLbl.Font = Enum.Font.GothamBold
     HelloLbl.TextSize = 11
@@ -1303,7 +1191,7 @@ local function createUI()
     StatsBar.TextXAlignment = Enum.TextXAlignment.Left
     StatsBar.Parent = GreetingBar
 
-    -- TAB BAR
+    -- TABS
     local TabBar = Instance.new("ScrollingFrame")
     TabBar.Name = "TabBar"
     TabBar.Size = UDim2.new(1, -16, 0, 34)
@@ -1314,13 +1202,12 @@ local function createUI()
     TabBar.CanvasSize = UDim2.new(0, 0, 0, 0)
     TabBar.ScrollingDirection = Enum.ScrollingDirection.X
     TabBar.Parent = Main
+    local tl2 = Instance.new("UIListLayout", TabBar)
+    tl2.FillDirection = Enum.FillDirection.Horizontal
+    tl2.Padding = UDim.new(0, 5)
+    tl2.SortOrder = Enum.SortOrder.LayoutOrder
 
-    local tabLayout = Instance.new("UIListLayout", TabBar)
-    tabLayout.FillDirection = Enum.FillDirection.Horizontal
-    tabLayout.Padding = UDim.new(0, 5)
-    tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    -- CONTENT — scrollable
+    -- CONTENT
     local Content = Instance.new("ScrollingFrame")
     Content.Name = "Content"
     Content.Size = UDim2.new(1, -16, 1, -160)
@@ -1334,14 +1221,13 @@ local function createUI()
     Content.ScrollingDirection = Enum.ScrollingDirection.Y
     Content.Parent = Main
     Instance.new("UICorner", Content).CornerRadius = UDim.new(0, 10)
-    local cStroke = Instance.new("UIStroke", Content)
-    cStroke.Color = Theme.BorderDim
-
-    local contentPad = Instance.new("UIPadding", Content)
-    contentPad.PaddingTop = UDim.new(0, 8)
-    contentPad.PaddingBottom = UDim.new(0, 8)
-    contentPad.PaddingLeft = UDim.new(0, 8)
-    contentPad.PaddingRight = UDim.new(0, 8)
+    local cs = Instance.new("UIStroke", Content)
+    cs.Color = Theme.BorderDim
+    local cp = Instance.new("UIPadding", Content)
+    cp.PaddingTop = UDim.new(0, 8)
+    cp.PaddingBottom = UDim.new(0, 8)
+    cp.PaddingLeft = UDim.new(0, 8)
+    cp.PaddingRight = UDim.new(0, 8)
 
     -- FOOTER
     local Footer = Instance.new("Frame")
@@ -1353,17 +1239,15 @@ local function createUI()
     Footer.Parent = Main
     Instance.new("UICorner", Footer).CornerRadius = UDim.new(0, 6)
     Instance.new("UIStroke", Footer).Color = Theme.BorderDim
-
     local FooterLbl = Instance.new("TextLabel", Footer)
     FooterLbl.Size = UDim2.new(1, -30, 1, 0)
     FooterLbl.Position = UDim2.new(0, 10, 0, 0)
     FooterLbl.BackgroundTransparency = 1
-    FooterLbl.Text = "k 0 · st 0/6 · frags 0 · dps 0"
+    FooterLbl.Text = "k 0 · st 0/6 · frags 0"
     FooterLbl.TextColor3 = Theme.TextDim
     FooterLbl.Font = Enum.Font.Gotham
     FooterLbl.TextSize = 9
     FooterLbl.TextXAlignment = Enum.TextXAlignment.Left
-
     local StatusDot = Instance.new("Frame", Footer)
     StatusDot.Size = UDim2.new(0, 7, 0, 7)
     StatusDot.Position = UDim2.new(1, -16, 0.5, -3)
@@ -1410,50 +1294,44 @@ local function createUI()
     end)
 
     -- ============================================
-    -- DRAG — FIXED (full screen, works on all sides)
+    -- DRAG (works from any side)
     -- ============================================
     local dragging = false
-    local dragStart, startPos
-
-    -- The fix: clamp the ACTUAL screen position, not the raw Offset.
-    -- Also uses scale 0 for returned UDim2 so offsets are absolute.
-    local function clampPos(newX, newY, obj)
-        local cam = Workspace.CurrentCamera
-        local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
-        local size = obj.AbsoluteSize
-        local margin = 25
-        local clampedX = math.clamp(newX, -size.X + margin, vp.X - margin)
-        local clampedY = math.clamp(newY, -size.Y + margin, vp.Y - margin)
-        return UDim2.new(0, clampedX, 0, clampedY)
-    end
+    local dragStart = nil
+    local startAbsX, startAbsY = 0, 0
 
     local function beginDrag(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
            or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
-            -- Convert current position to absolute screen offset
             local cam = Workspace.CurrentCamera
             local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
-            startPos = {
-                x = Main.Position.X.Scale * vp.X + Main.Position.X.Offset,
-                y = Main.Position.Y.Scale * vp.Y + Main.Position.Y.Offset,
-            }
+            startAbsX = Main.Position.X.Scale * vp.X + Main.Position.X.Offset
+            startAbsY = Main.Position.Y.Scale * vp.Y + Main.Position.Y.Offset
+            Main.Position = UDim2.new(0, startAbsX, 0, startAbsY)
         end
     end
 
     local function moveDrag(input)
-        if not dragging then return end
+        if not dragging or not dragStart then return end
         if input.UserInputType ~= Enum.UserInputType.MouseMovement
            and input.UserInputType ~= Enum.UserInputType.Touch then return end
         local delta = input.Position - dragStart
-        Main.Position = clampPos(startPos.x + delta.X, startPos.y + delta.Y, Main)
+        local cam = Workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
+        local size = Main.AbsoluteSize
+        local margin = 25
+        local nx = math.clamp(startAbsX + delta.X, -size.X + margin, vp.X - margin)
+        local ny = math.clamp(startAbsY + delta.Y, -size.Y + margin, vp.Y - margin)
+        Main.Position = UDim2.new(0, nx, 0, ny)
     end
 
     local function endDrag(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
            or input.UserInputType == Enum.UserInputType.Touch then
             dragging = false
+            dragStart = nil
         end
     end
 
@@ -1463,46 +1341,29 @@ local function createUI()
     UserInputService.InputChanged:Connect(moveDrag)
     UserInputService.InputEnded:Connect(endDrag)
 
-    -- Let title bar children pass through to drag
-    for _, child in ipairs(TitleBar:GetChildren()) do
-        if child:IsA("TextLabel") then
-            child.Active = false
-        end
-    end
-
     -- TAB SYSTEM
     local Tabs = {}
-    local ActiveTabName = nil
-
     local function switchTab(name)
         for tn, tab in pairs(Tabs) do
             if tn == name then
                 tab.Content.Visible = true
-                TweenService:Create(tab.Button, TweenInfo.new(0.12), {
-                    BackgroundColor3 = Theme.PurpleDeep,
-                }):Play()
+                TweenService:Create(tab.Button, TweenInfo.new(0.12), { BackgroundColor3 = Theme.PurpleDeep }):Play()
                 tab.Button.TextColor3 = Theme.Gold
                 tab.Indicator.Visible = true
-                -- Reset scroll to top
                 Content.CanvasPosition = Vector2.new(0, 0)
-                -- Update canvas size to fit this tab's content
                 task.defer(function()
-                    local layoutSize = tab.Content:FindFirstChildOfClass("UIListLayout")
-                    if layoutSize then
-                        local cSize = layoutSize.AbsoluteContentSize.Y
-                        Content.CanvasSize = UDim2.new(0, 0, 0, cSize + 20)
+                    local l = tab.Content:FindFirstChildOfClass("UIListLayout")
+                    if l then
+                        Content.CanvasSize = UDim2.new(0, 0, 0, l.AbsoluteContentSize.Y + 20)
                     end
                 end)
             else
                 tab.Content.Visible = false
-                TweenService:Create(tab.Button, TweenInfo.new(0.12), {
-                    BackgroundColor3 = Theme.Card,
-                }):Play()
+                TweenService:Create(tab.Button, TweenInfo.new(0.12), { BackgroundColor3 = Theme.Card }):Play()
                 tab.Button.TextColor3 = Theme.TextDim
                 tab.Indicator.Visible = false
             end
         end
-        ActiveTabName = name
         Config.ActivePage = name
     end
 
@@ -1521,16 +1382,14 @@ local function createUI()
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
         Instance.new("UIStroke", btn).Color = Theme.BorderDim
 
-        local indicator = Instance.new("Frame")
-        indicator.Size = UDim2.new(0.6, 0, 0, 2)
-        indicator.Position = UDim2.new(0.2, 0, 1, -3)
-        indicator.BackgroundColor3 = Theme.Gold
-        indicator.BorderSizePixel = 0
-        indicator.Visible = false
-        indicator.Parent = btn
-        Instance.new("UICorner", indicator).CornerRadius = UDim.new(1, 0)
-        local indGrad = Instance.new("UIGradient", indicator)
-        indGrad.Color = ColorSequence.new(Theme.GoldBright, Theme.Gold)
+        local ind = Instance.new("Frame")
+        ind.Size = UDim2.new(0.6, 0, 0, 2)
+        ind.Position = UDim2.new(0.2, 0, 1, -3)
+        ind.BackgroundColor3 = Theme.Gold
+        ind.BorderSizePixel = 0
+        ind.Visible = false
+        ind.Parent = btn
+        Instance.new("UICorner", ind).CornerRadius = UDim.new(1, 0)
 
         local content = Instance.new("Frame")
         content.Name = name .. "Content"
@@ -1538,12 +1397,10 @@ local function createUI()
         content.BackgroundTransparency = 1
         content.Visible = false
         content.Parent = Content
-
         local layout = Instance.new("UIListLayout", content)
         layout.Padding = UDim.new(0, 6)
         layout.SortOrder = Enum.SortOrder.LayoutOrder
 
-        -- Auto-resize content height to fit children
         layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
             content.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y)
             if content.Visible then
@@ -1552,7 +1409,7 @@ local function createUI()
         end)
 
         btn.MouseButton1Click:Connect(function() switchTab(name) end)
-        Tabs[name] = { Button = btn, Content = content, Indicator = indicator }
+        Tabs[name] = { Button = btn, Content = content, Indicator = ind }
         return content
     end
 
@@ -1611,30 +1468,26 @@ local function createUI()
         local knob = Instance.new("Frame", pill)
         knob.Size = UDim2.new(0, 12, 0, 12)
         knob.Position = default and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
-        knob.BackgroundColor3 = Color3.fromRGB(255,255,255)
+        knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         knob.BorderSizePixel = 0
         Instance.new("UICorner", knob).CornerRadius = UDim.new(0, 6)
 
         local state = default
-        local function apply(v, animate)
+        local function apply(v)
             state = v
             local tp = state and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
             local tc = state and Theme.Emerald or Theme.Border
-            if animate then
-                TweenService:Create(knob, TweenInfo.new(0.1), {Position = tp}):Play()
-                TweenService:Create(pill, TweenInfo.new(0.1), {BackgroundColor3 = tc}):Play()
-            else
-                knob.Position = tp; pill.BackgroundColor3 = tc
-            end
+            TweenService:Create(knob, TweenInfo.new(0.1), { Position = tp }):Play()
+            TweenService:Create(pill, TweenInfo.new(0.1), { BackgroundColor3 = tc }):Play()
             if callback then callback(state) end
         end
         h.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1
                or input.UserInputType == Enum.UserInputType.Touch then
-                apply(not state, true)
+                apply(not state)
             end
         end)
-        return { Set = function(v) apply(v, true) end, Get = function() return state end }
+        return { Set = function(v) apply(v) end }
     end
 
     local function makeButton(parent, name, callback, accentColor, order)
@@ -1667,10 +1520,10 @@ local function createUI()
         lbl.TextXAlignment = Enum.TextXAlignment.Left
 
         b.MouseEnter:Connect(function()
-            TweenService:Create(b, TweenInfo.new(0.1), {BackgroundColor3 = Theme.CardHover}):Play()
+            TweenService:Create(b, TweenInfo.new(0.1), { BackgroundColor3 = Theme.CardHover }):Play()
         end)
         b.MouseLeave:Connect(function()
-            TweenService:Create(b, TweenInfo.new(0.1), {BackgroundColor3 = Theme.CardSub}):Play()
+            TweenService:Create(b, TweenInfo.new(0.1), { BackgroundColor3 = Theme.CardSub }):Play()
         end)
         b.MouseButton1Click:Connect(function()
             if callback then task.spawn(function() pcall(callback) end) end
@@ -1719,13 +1572,11 @@ local function createUI()
         fill.BackgroundColor3 = Theme.Purple
         fill.BorderSizePixel = 0
         Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
-        local fillGrad = Instance.new("UIGradient", fill)
-        fillGrad.Color = ColorSequence.new(Theme.PurpleBright, Theme.PurpleDeep)
 
         local knob = Instance.new("Frame", track)
         knob.Size = UDim2.new(0, 11, 0, 11)
         knob.Position = UDim2.new((default - min) / (max - min), -5, 0.5, -5.5)
-        knob.BackgroundColor3 = Color3.fromRGB(255,255,255)
+        knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         knob.BorderSizePixel = 0
         Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
         Instance.new("UIStroke", knob).Color = Theme.Purple
@@ -1745,7 +1596,8 @@ local function createUI()
         track.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1
                or input.UserInputType == Enum.UserInputType.Touch then
-                draggingSlider = true; update(input)
+                draggingSlider = true
+                update(input)
             end
         end)
         local function sd(input)
@@ -1762,12 +1614,6 @@ local function createUI()
                 draggingSlider = false
             end
         end)
-        return { Set = function(v)
-            local pct = (v - min) / (max - min)
-            fill.Size = UDim2.new(pct, 0, 1, 0)
-            knob.Position = UDim2.new(pct, -5, 0.5, -5.5)
-            vLbl.Text = tostring(math.floor(v))
-        end }
     end
 
     local function makeLabel(parent, text, color, order)
@@ -1784,11 +1630,10 @@ local function createUI()
         return l
     end
 
-    -- TAB: HOME
+    -- HOME TAB
     local HomeTab = createTab("Home", "⌂", 1)
     makeSection(HomeTab, "Live Stats", 1)
     local statsCard = makeCard(HomeTab, 68, 2)
-
     local function statBox(xOff, w, label, accent)
         local box = Instance.new("Frame", statsCard)
         box.Size = UDim2.new(w, 0, 0, 48)
@@ -1796,7 +1641,6 @@ local function createUI()
         box.BackgroundColor3 = Theme.CardSub
         box.BorderSizePixel = 0
         Instance.new("UICorner", box).CornerRadius = UDim.new(0, 8)
-
         local acc = Instance.new("Frame", box)
         acc.Size = UDim2.new(0, 3, 0.6, 0)
         acc.Position = UDim2.new(0, 6, 0.5, 0)
@@ -1804,7 +1648,6 @@ local function createUI()
         acc.BackgroundColor3 = accent
         acc.BorderSizePixel = 0
         Instance.new("UICorner", acc).CornerRadius = UDim.new(1, 0)
-
         local lbl = Instance.new("TextLabel", box)
         lbl.Size = UDim2.new(1, -14, 0, 12)
         lbl.Position = UDim2.new(0, 14, 0, 8)
@@ -1814,7 +1657,6 @@ local function createUI()
         lbl.Font = Enum.Font.Gotham
         lbl.TextSize = 9
         lbl.TextXAlignment = Enum.TextXAlignment.Left
-
         local val = Instance.new("TextLabel", box)
         val.Size = UDim2.new(1, -14, 0, 20)
         val.Position = UDim2.new(0, 14, 0, 22)
@@ -1826,12 +1668,11 @@ local function createUI()
         val.TextXAlignment = Enum.TextXAlignment.Left
         return val
     end
-
     local KillVal = statBox(6, 0.3, "KILLS", Theme.Crimson)
     local StoneVal = statBox(10 + 0.3 * 520, 0.3, "STONES", Theme.Purple)
     local FragVal = statBox(14 + 0.6 * 520, 0.3, "FRAGS", Theme.Emerald)
 
-    makeSection(HomeTab, "Session Info", 3)
+    makeSection(HomeTab, "Session", 3)
     local sessionCard = makeCard(HomeTab, 52, 4)
     local SessionLbl = Instance.new("TextLabel", sessionCard)
     SessionLbl.Size = UDim2.new(1, -20, 0, 16)
@@ -1842,147 +1683,120 @@ local function createUI()
     SessionLbl.Font = Enum.Font.GothamBold
     SessionLbl.TextSize = 12
     SessionLbl.TextXAlignment = Enum.TextXAlignment.Left
-
     local ExecLbl = Instance.new("TextLabel", sessionCard)
     ExecLbl.Size = UDim2.new(1, -20, 0, 14)
     ExecLbl.Position = UDim2.new(0, 12, 0, 28)
     ExecLbl.BackgroundTransparency = 1
-    ExecLbl.Text = "Executor: " .. Executor.Name .. "  ·  Mobile: " .. tostring(Executor.Mobile)
+    ExecLbl.Text = "Ex: " .. Executor.Name .. " · Mobile: " .. tostring(Executor.Mobile)
     ExecLbl.TextColor3 = Theme.TextMuted
     ExecLbl.Font = Enum.Font.Gotham
     ExecLbl.TextSize = 9
     ExecLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-    makeSection(HomeTab, "Quick Actions", 5)
+    makeSection(HomeTab, "Actions", 5)
     makeButton(HomeTab, "⇄  Rejoin Server", function()
         TeleportService:Teleport(game.PlaceId, LocalPlayer)
     end, Theme.Blue, 6)
-    makeButton(HomeTab, "⟲  Reset Session Stats", function()
+    makeButton(HomeTab, "⟲  Reset Stats", function()
         State.KillCount = 0
         State.FragmentCount = 0
-        State.AstraWave = 0
-        Config.DPSWindow = {}
     end, Theme.Card, 7)
 
-    -- TAB: COMBAT
+    -- COMBAT TAB
     local CombatTab = createTab("Combat", "⚔", 2)
-    makeSection(CombatTab, "Throw-Above Auto Kill", 1)
-    local akCard = makeCard(CombatTab, 100, 2)
-    local akTitle = Instance.new("TextLabel", akCard)
-    akTitle.Size = UDim2.new(1, -20, 0, 16)
-    akTitle.Position = UDim2.new(0, 12, 0, 6)
-    akTitle.BackgroundTransparency = 1
-    akTitle.Text = "Auto Kill · one at a time"
-    akTitle.TextColor3 = Theme.Text
-    akTitle.Font = Enum.Font.GothamBold
-    akTitle.TextSize = 11
-    akTitle.TextXAlignment = Enum.TextXAlignment.Left
-
-    local akDesc = Instance.new("TextLabel", akCard)
-    akDesc.Size = UDim2.new(1, -20, 0, 12)
-    akDesc.Position = UDim2.new(0, 12, 0, 22)
-    akDesc.BackgroundTransparency = 1
-    akDesc.Text = "Throws above · expands hitbox · slams down"
-    akDesc.TextColor3 = Theme.TextMuted
-    akDesc.Font = Enum.Font.Gotham
-    akDesc.TextSize = 9
-    akDesc.TextXAlignment = Enum.TextXAlignment.Left
-
-    local akHolder = Instance.new("Frame", akCard)
-    akHolder.Size = UDim2.new(1, -20, 0, 52)
-    akHolder.Position = UDim2.new(0, 10, 0, 40)
-    akHolder.BackgroundTransparency = 1
-    local akLayout = Instance.new("UIListLayout", akHolder)
-    akLayout.Padding = UDim.new(0, 5)
-    akLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    makeToggle(akHolder, "Auto Kill", false, function(v)
+    makeSection(CombatTab, "Throw-Above Killer", 1)
+    local ak = makeCard(CombatTab, 100, 2)
+    local akt = Instance.new("TextLabel", ak)
+    akt.Size = UDim2.new(1, -20, 0, 16)
+    akt.Position = UDim2.new(0, 12, 0, 6)
+    akt.BackgroundTransparency = 1
+    akt.Text = "Auto Kill · one at a time"
+    akt.TextColor3 = Theme.Text
+    akt.Font = Enum.Font.GothamBold
+    akt.TextSize = 11
+    akt.TextXAlignment = Enum.TextXAlignment.Left
+    local akh = Instance.new("Frame", ak)
+    akh.Size = UDim2.new(1, -20, 0, 52)
+    akh.Position = UDim2.new(0, 10, 0, 40)
+    akh.BackgroundTransparency = 1
+    local akhl = Instance.new("UIListLayout", akh)
+    akhl.Padding = UDim.new(0, 5)
+    akhl.SortOrder = Enum.SortOrder.LayoutOrder
+    makeToggle(akh, "Auto Kill", false, function(v)
         Config.AutoKill = v
         if v then lockClickPosition(); autoKillLoop() end
     end, 1)
-    makeToggle(akHolder, "Freeze Target", true, function(v) Config.FreezeTarget = v end, 2)
+    makeToggle(akh, "Freeze Target", true, function(v) Config.FreezeTarget = v end, 2)
 
     makeSection(CombatTab, "Settings", 3)
-    local ksCard = makeCard(CombatTab, 180, 4)
-    local ksHolder = Instance.new("Frame", ksCard)
-    ksHolder.Size = UDim2.new(1, -20, 1, -16)
-    ksHolder.Position = UDim2.new(0, 10, 0, 8)
-    ksHolder.BackgroundTransparency = 1
-    local ksLayout = Instance.new("UIListLayout", ksHolder)
-    ksLayout.Padding = UDim.new(0, 6)
-    ksLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    makeSlider(ksHolder, "Throw Height", 10, 200, 50, function(v) Config.ThrowHeight = v end, 1)
-    makeSlider(ksHolder, "Kill Delay (ms)", 1, 30, 5, function(v) Config.KillDelay = v / 100 end, 2)
-    makeSlider(ksHolder, "Hitbox Size", 3, 30, 15, function(v) Config.HitboxSize = v end, 3)
-    makeSlider(ksHolder, "Lock Timeout", 1, 10, 3, function(v) Config.KillLockTimeout = v end, 4)
+    local ks = makeCard(CombatTab, 180, 4)
+    local ksh = Instance.new("Frame", ks)
+    ksh.Size = UDim2.new(1, -20, 1, -16)
+    ksh.Position = UDim2.new(0, 10, 0, 8)
+    ksh.BackgroundTransparency = 1
+    local kshl = Instance.new("UIListLayout", ksh)
+    kshl.Padding = UDim.new(0, 6)
+    kshl.SortOrder = Enum.SortOrder.LayoutOrder
+    makeSlider(ksh, "Throw Height", 10, 200, 50, function(v) Config.ThrowHeight = v end, 1)
+    makeSlider(ksh, "Kill Delay (ms)", 1, 30, 5, function(v) Config.KillDelay = v / 100 end, 2)
+    makeSlider(ksh, "Hitbox Size", 3, 30, 15, function(v) Config.HitboxSize = v end, 3)
+    makeSlider(ksh, "Lock Timeout", 1, 10, 3, function(v) Config.KillLockTimeout = v end, 4)
 
     makeSection(CombatTab, "Kill Aura", 5)
-    local auraCard = makeCard(CombatTab, 90, 6)
-    local auHolder = Instance.new("Frame", auraCard)
-    auHolder.Size = UDim2.new(1, -20, 0, 70)
-    auHolder.Position = UDim2.new(0, 10, 0, 10)
-    auHolder.BackgroundTransparency = 1
-    local auLayout = Instance.new("UIListLayout", auHolder)
-    auLayout.Padding = UDim.new(0, 6)
-    auLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    makeToggle(auHolder, "Kill Aura", false, function(v)
+    local au = makeCard(CombatTab, 90, 6)
+    local auh = Instance.new("Frame", au)
+    auh.Size = UDim2.new(1, -20, 0, 70)
+    auh.Position = UDim2.new(0, 10, 0, 10)
+    auh.BackgroundTransparency = 1
+    local auL = Instance.new("UIListLayout", auh)
+    auL.Padding = UDim.new(0, 6)
+    auL.SortOrder = Enum.SortOrder.LayoutOrder
+    makeToggle(auh, "Kill Aura", false, function(v)
         Config.KillAura = v
         if v then killAuraLoop() end
     end, 1)
-    makeSlider(auHolder, "Aura Range", 10, 200, 55, function(v) Config.AuraRange = v end, 2)
+    makeSlider(auh, "Aura Range", 10, 200, 55, function(v) Config.AuraRange = v end, 2)
 
     makeSection(CombatTab, "Auto Farm", 7)
-    local farmCard = makeCard(CombatTab, 90, 8)
-    local fmHolder = Instance.new("Frame", farmCard)
-    fmHolder.Size = UDim2.new(1, -20, 0, 70)
-    fmHolder.Position = UDim2.new(0, 10, 0, 10)
-    fmHolder.BackgroundTransparency = 1
-    local fmLayout = Instance.new("UIListLayout", fmHolder)
-    fmLayout.Padding = UDim.new(0, 6)
-    fmLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    makeToggle(fmHolder, "Auto Farm", false, function(v)
+    local fm = makeCard(CombatTab, 90, 8)
+    local fmh = Instance.new("Frame", fm)
+    fmh.Size = UDim2.new(1, -20, 0, 70)
+    fmh.Position = UDim2.new(0, 10, 0, 10)
+    fmh.BackgroundTransparency = 1
+    local fmL = Instance.new("UIListLayout", fmh)
+    fmL.Padding = UDim.new(0, 6)
+    fmL.SortOrder = Enum.SortOrder.LayoutOrder
+    makeToggle(fmh, "Auto Farm", false, function(v)
         Config.AutoFarm = v
         if v then autoFarmLoop() end
     end, 1)
-    makeToggle(fmHolder, "Auto Soul Farm", false, function(v)
+    makeToggle(fmh, "Auto Soul Farm", false, function(v)
         Config.AutoSoulFarm = v
         if v then soulFarmLoop() end
     end, 2)
 
-    -- TAB: GEAR
+    -- GEAR TAB
     local GearTab = createTab("Gear", "⚜", 3)
     makeSection(GearTab, "Weapon Getters", 1)
-    makeLabel(GearTab, "Checks requirements · auto-collects if missing", Theme.TextMuted, 2)
-
+    makeLabel(GearTab, "Checks requirements before attempting", Theme.TextMuted, 2)
     for i, weapon in ipairs(WeaponDB) do
         makeButton(GearTab, "◆ " .. weapon.name, function()
             local canGet, missing = checkRequirements(weapon.name)
             if not canGet then
-                local missingText = table.concat(missing, " · ")
-                notify("Cannot Get " .. weapon.name, missingText, Theme.Crimson, 5)
+                notify("Cannot Get " .. weapon.name, table.concat(missing, " · "), Theme.Crimson, 5)
                 return
             end
-            notify("Getting " .. weapon.name, "Requirements met. Teleporting...", weapon.color, 3)
-            local searchTerms = {weapon.name:lower()}
-            if weapon.name == "Infinity Gauntlet" or weapon.name == "Upgraded Infinity Gauntlet" then
-                searchTerms = {"forge", "celestial"}
-            elseif weapon.name == "Stormbreaker" or weapon.name == "Mjolnir" then
-                searchTerms = {"forge"}
-            elseif weapon.name == "Surtur's Sword" then
-                searchTerms = {"surtur", "catacomb"}
-            elseif weapon.name == "Hadron Enforcer" then
-                searchTerms = {"lunar", "moon", "craft"}
-            elseif weapon.name == "Cosmi-Rod" then
-                searchTerms = {"celestial", "catacomb"}
-            elseif weapon.name == "Secret Weapon" then
-                searchTerms = {"secret", "sword"}
-            elseif weapon.name == "Mechanical Gloves" then
-                searchTerms = {"doom", "boss"}
+            notify("Getting " .. weapon.name, "Requirements met", weapon.color, 3)
+            local terms = {weapon.name:lower()}
+            if weapon.name:find("Gauntlet") then terms = {"forge", "celestial"}
+            elseif weapon.name == "Stormbreaker" or weapon.name == "Mjolnir" then terms = {"forge"}
+            elseif weapon.name == "Surtur's Sword" then terms = {"surtur", "catacomb"}
+            elseif weapon.name == "Hadron Enforcer" then terms = {"lunar", "moon"}
+            elseif weapon.name == "Cosmi-Rod" then terms = {"celestial", "catacomb"}
+            elseif weapon.name == "Secret Weapon" then terms = {"secret", "sword"}
+            elseif weapon.name == "Mechanical Gloves" then terms = {"doom"}
             end
-            local obj = findObjectByTerms(searchTerms)
+            local obj = findObjectByTerms(terms)
             if obj then
                 local part = obj:IsA("Model") and (obj:FindFirstChild("Handle") or obj:FindFirstChildWhichIsA("BasePart")) or obj
                 if part then
@@ -1993,24 +1807,22 @@ local function createUI()
                         pcall(function() LocalPlayer:GetMouse() mouse1click() end)
                     end
                 end
-            else
-                notify("Location Not Found", "Could not find " .. weapon.name .. " spawn", Theme.Crimson, 3)
             end
         end, weapon.color, 2 + i)
     end
 
     makeSection(GearTab, "Auto-Collect Materials", 20)
-    makeToggle(GearTab, "Auto Lunar Fragment (NPC 2.0)", false, function(v)
+    makeToggle(GearTab, "Auto Lunar Fragment", false, function(v)
         Config.AutoCollectLunar = v
         State.LunarFragment = false
         if v then autoCollectLunarLoop() end
     end, 21)
-    makeToggle(GearTab, "Auto Celestial Fragment (Rock)", false, function(v)
+    makeToggle(GearTab, "Auto Celestial Fragment", false, function(v)
         Config.AutoCollectCelestial = v
         State.CelestialFragment = false
         if v then autoCollectCelestialLoop() end
     end, 22)
-    makeToggle(GearTab, "Auto Frost Fragments (Present 3)", false, function(v)
+    makeToggle(GearTab, "Auto Frost Fragments", false, function(v)
         Config.AutoCollectFrost = v
         State.FrostFragments = 0
         if v then autoCollectFrostLoop() end
@@ -2038,14 +1850,14 @@ local function createUI()
         end, s[2], 24 + i)
     end
 
-    -- TAB: AUTO
+    -- AUTO TAB
     local AutoTab = createTab("Auto", "⚙", 4)
     makeSection(AutoTab, "Auto Upgrade Gauntlet", 1)
     makeToggle(AutoTab, "Auto Kill for Upgrade (200k)", false, function(v)
         Config.AutoKillForUpgrade = v
         if v then autoKillForUpgradeLoop() end
     end, 2)
-    makeToggle(AutoTab, "Auto Activate Celestial Forge", false, function(v)
+    makeToggle(AutoTab, "Auto Activate Forge", false, function(v)
         Config.AutoUpgradeGauntlet = v
         if v then autoUpgradeGauntletLoop() end
     end, 3)
@@ -2060,17 +1872,17 @@ local function createUI()
         if v then autoForgeLoop() end
     end, 6)
 
-    makeSection(AutoTab, "Astra Waves", 7)
-    makeToggle(AutoTab, "Auto Disintegrate (Spawn Astra)", false, function(v)
+    makeSection(AutoTab, "Astra", 7)
+    makeToggle(AutoTab, "Auto Disintegrate", false, function(v)
         Config.AutoDisintegrate = v
         if v then autoDisintegrateLoop() end
     end, 8)
-    makeToggle(AutoTab, "Auto Astra Wave Farm", false, function(v)
+    makeToggle(AutoTab, "Auto Astra Waves", false, function(v)
         Config.AutoAstraWaves = v
         if v then autoAstraWavesLoop() end
     end, 9)
 
-    makeSection(AutoTab, "Stones & PowerStone", 10)
+    makeSection(AutoTab, "Stones", 10)
     makeToggle(AutoTab, "Auto Collect Stones", false, function(v)
         Config.AutoCollectStones = v
         if v then autoCollectStonesLoop() end
@@ -2080,86 +1892,82 @@ local function createUI()
         if v then autoPowerStoneLoop() end
     end, 12)
 
-    -- TAB: MISC
+    -- MISC TAB
     local MiscTab = createTab("Misc", "✦", 5)
     makeSection(MiscTab, "Character", 1)
-    local charCard = makeCard(MiscTab, 200, 2)
-    local chHolder = Instance.new("Frame", charCard)
-    chHolder.Size = UDim2.new(1, -20, 1, -16)
-    chHolder.Position = UDim2.new(0, 10, 0, 8)
-    chHolder.BackgroundTransparency = 1
-    local chLayout = Instance.new("UIListLayout", chHolder)
-    chLayout.Padding = UDim.new(0, 4)
-    chLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    makeToggle(chHolder, "Auto Equip Best Weapon", true, function(v)
+    local ch = makeCard(MiscTab, 200, 2)
+    local chh = Instance.new("Frame", ch)
+    chh.Size = UDim2.new(1, -20, 1, -16)
+    chh.Position = UDim2.new(0, 10, 0, 8)
+    chh.BackgroundTransparency = 1
+    local chL = Instance.new("UIListLayout", chh)
+    chL.Padding = UDim.new(0, 4)
+    chL.SortOrder = Enum.SortOrder.LayoutOrder
+    makeToggle(chh, "Auto Equip Best Weapon", true, function(v)
         Config.AutoEquipBest = v
         if v then autoEquipLoop() end
     end, 1)
-    makeToggle(chHolder, "Anti-AFK", true, function(v) Config.AntiAFK = v end, 2)
-    makeToggle(chHolder, "God Mode", false, function(v)
+    makeToggle(chh, "Anti-AFK", true, function(v) Config.AntiAFK = v end, 2)
+    makeToggle(chh, "God Mode", false, function(v)
         Config.GodMode = v
         if v then godModeLoop() end
     end, 3)
-    makeToggle(chHolder, "Fly", false, function(v)
+    makeToggle(chh, "Fly", false, function(v)
         Config.Fly = v
         if v then flyLoop() end
     end, 4)
-    makeToggle(chHolder, "Infinite Jump", false, function(v) Config.InfiniteJump = v end, 5)
-    makeToggle(chHolder, "No Clip", false, function(v) Config.NoClip = v end, 6)
+    makeToggle(chh, "Infinite Jump", false, function(v) Config.InfiniteJump = v end, 5)
+    makeToggle(chh, "No Clip", false, function(v) Config.NoClip = v end, 6)
 
     makeSection(MiscTab, "Movement", 3)
-    local mvCard = makeCard(MiscTab, 140, 4)
-    local mvHolder = Instance.new("Frame", mvCard)
-    mvHolder.Size = UDim2.new(1, -20, 1, -16)
-    mvHolder.Position = UDim2.new(0, 10, 0, 8)
-    mvHolder.BackgroundTransparency = 1
-    local mvLayout = Instance.new("UIListLayout", mvHolder)
-    mvLayout.Padding = UDim.new(0, 6)
-    mvLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    makeToggle(mvHolder, "Speed Hack", false, function(v)
+    local mv = makeCard(MiscTab, 140, 4)
+    local mvh = Instance.new("Frame", mv)
+    mvh.Size = UDim2.new(1, -20, 1, -16)
+    mvh.Position = UDim2.new(0, 10, 0, 8)
+    mvh.BackgroundTransparency = 1
+    local mvL = Instance.new("UIListLayout", mvh)
+    mvL.Padding = UDim.new(0, 6)
+    mvL.SortOrder = Enum.SortOrder.LayoutOrder
+    makeToggle(mvh, "Speed Hack", false, function(v)
         Config.SpeedHack = v
         local hum = getHumanoid()
         if hum then hum.WalkSpeed = v and Config.SpeedValue or 16 end
     end, 1)
-    makeSlider(mvHolder, "Speed Value", 16, 200, 50, function(v) Config.SpeedValue = v end, 2)
-    makeSlider(mvHolder, "Fly Speed", 10, 200, 60, function(v) Config.FlySpeed = v end, 3)
+    makeSlider(mvh, "Speed Value", 16, 200, 50, function(v) Config.SpeedValue = v end, 2)
+    makeSlider(mvh, "Fly Speed", 10, 200, 60, function(v) Config.FlySpeed = v end, 3)
 
     makeSection(MiscTab, "Safety", 5)
-    local safetyCard = makeCard(MiscTab, 100, 6)
-    local sHolder = Instance.new("Frame", safetyCard)
-    sHolder.Size = UDim2.new(1, -20, 1, -16)
-    sHolder.Position = UDim2.new(0, 10, 0, 8)
-    sHolder.BackgroundTransparency = 1
-    local sLayout = Instance.new("UIListLayout", sHolder)
-    sLayout.Padding = UDim.new(0, 4)
-    sLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    makeToggle(sHolder, "Anti-Fling", false, function(v)
+    local sf = makeCard(MiscTab, 100, 6)
+    local sfh = Instance.new("Frame", sf)
+    sfh.Size = UDim2.new(1, -20, 1, -16)
+    sfh.Position = UDim2.new(0, 10, 0, 8)
+    sfh.BackgroundTransparency = 1
+    local sfL = Instance.new("UIListLayout", sfh)
+    sfL.Padding = UDim.new(0, 4)
+    sfL.SortOrder = Enum.SortOrder.LayoutOrder
+    makeToggle(sfh, "Anti-Fling", false, function(v)
         Config.AntiFling = v
         if v then antiFlingLoop() end
     end, 1)
-    makeToggle(sHolder, "Auto Parry", false, function(v)
+    makeToggle(sfh, "Auto Parry", false, function(v)
         Config.AutoParry = v
         if v then autoParryLoop() end
     end, 2)
 
     makeSection(MiscTab, "Visuals", 7)
-    local visCard = makeCard(MiscTab, 100, 8)
-    local vHolder = Instance.new("Frame", visCard)
-    vHolder.Size = UDim2.new(1, -20, 1, -16)
-    vHolder.Position = UDim2.new(0, 10, 0, 8)
-    vHolder.BackgroundTransparency = 1
-    local vLayout = Instance.new("UIListLayout", vHolder)
-    vLayout.Padding = UDim.new(0, 4)
-    vLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    makeToggle(vHolder, "NPC ESP", false, function(v)
+    local vs = makeCard(MiscTab, 100, 8)
+    local vsh = Instance.new("Frame", vs)
+    vsh.Size = UDim2.new(1, -20, 1, -16)
+    vsh.Position = UDim2.new(0, 10, 0, 8)
+    vsh.BackgroundTransparency = 1
+    local vsL = Instance.new("UIListLayout", vsh)
+    vsL.Padding = UDim.new(0, 4)
+    vsL.SortOrder = Enum.SortOrder.LayoutOrder
+    makeToggle(vsh, "NPC ESP", false, function(v)
         Config.ESP = v
         if v then espLoop() end
     end, 1)
-    makeToggle(vHolder, "Full Bright", false, function(v) Config.FullBright = v end, 2)
+    makeToggle(vsh, "Full Bright", false, function(v) Config.FullBright = v end, 2)
 
     makeSection(MiscTab, "Actions", 9)
     makeButton(MiscTab, "↺  Reset Character", function()
@@ -2168,11 +1976,11 @@ local function createUI()
             char.Humanoid.Health = 0
         end
     end, Theme.Crimson, 10)
-    makeButton(MiscTab, "⇄  Rejoin Server", function()
+    makeButton(MiscTab, "⇄  Rejoin", function()
         TeleportService:Teleport(game.PlaceId, LocalPlayer)
     end, Theme.Blue, 11)
 
-    -- LIVE UPDATER
+    -- UPDATER
     task.spawn(function()
         while ScreenGui.Parent do
             pcall(function()
@@ -2181,22 +1989,16 @@ local function createUI()
                 for _, c in pairs(Config.StonesCollected) do if c then st = st + 1 end end
                 if StoneVal then StoneVal.Text = st .. "/6" end
                 if FragVal then FragVal.Text = fmt(State.FragmentCount or 0) end
-
                 local elapsed = os.time() - (State.InitTimestamp or os.time())
                 if SessionLbl then SessionLbl.Text = "Time in session: " .. formatTime(elapsed) end
-
                 if StatsBar then
-                    StatsBar.Text = string.format("kills %s · stones %d/6 · frags %s · frost %d",
-                        fmt(State.KillCount or 0), st, fmt(State.FragmentCount or 0), State.FrostFragments or 0)
+                    StatsBar.Text = string.format("kills %s · stones %d/6 · frags %s",
+                        fmt(State.KillCount or 0), st, fmt(State.FragmentCount or 0))
                 end
-
                 if FooterLbl then
-                    local tgt = Config.CurrentTarget and Config.CurrentTarget.name or "–"
-                    if #tgt > 10 then tgt = tgt:sub(1, 10) .. "…" end
-                    FooterLbl.Text = string.format("k %s · st %d/6 · frags %s · tgt %s",
-                        fmt(State.KillCount or 0), st, fmt(State.FragmentCount or 0), tgt)
+                    FooterLbl.Text = string.format("k %s · st %d/6 · frags %s",
+                        fmt(State.KillCount or 0), st, fmt(State.FragmentCount or 0))
                 end
-
                 local active = Config.AutoKill or Config.KillAura or Config.AutoFarm
                     or Config.AutoTemplarFarm or Config.AutoAstraWaves
                     or Config.AutoCollectStones or Config.AutoKillForUpgrade
@@ -2216,15 +2018,15 @@ end
 -- ============================================
 -- BOOT
 -- ============================================
-print("[P] Stage 1: services loaded")
+print("[P] Stage 1: services")
 
 local ok, GUI = pcall(createUI)
 if not ok then
-    warn("[P] UI creation FAILED:", GUI)
+    warn("[P] UI FAILED:", GUI)
     pcall(function()
         StarterGui:SetCore("SendNotification", {
             Title = "P | Load Failed",
-            Text = tostring(GUI):sub(1, 100),
+            Text = tostring(GUI):sub(1, 150),
             Duration = 10,
         })
     end)
@@ -2279,20 +2081,15 @@ end)
 
 task.wait(0.3)
 pcall(function()
-    notify("P | Thanos Simulator", "v4.2 loaded — scrollable UI", Theme.Purple, 4)
-end)
-task.wait(0.2)
-pcall(function()
-    notify("Full Drag Ready", "Drag title bar anywhere", Theme.Emerald, 4)
+    notify("P | Thanos Simulator", "v4.3 loaded", Theme.Purple, 4)
 end)
 
 pcall(function()
     StarterGui:SetCore("SendNotification", {
         Title = "P | Thanos Simulator",
-        Text = "Loaded. Drag title bar · scroll content for more options.",
+        Text = "Loaded. Drag title bar anywhere · scroll for more.",
         Duration = 6,
     })
 end)
 
 print("[P] Loaded. Executor:", Executor.Name, "| Mobile:", Executor.Mobile)
-print("[P] Weapons in DB:", #WeaponDB)

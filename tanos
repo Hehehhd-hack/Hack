@@ -1,6 +1,6 @@
 -- ============================================
 -- Infinity Gauntlet | Thanos Simulator
--- "P" Edition — Vertical Mobile Build
+-- "P" Edition — Horizontal Build
 -- Hitbox + Kill Aura + Anti-Detection
 -- Delta Executor (Mobile) Compatible
 -- ============================================
@@ -18,7 +18,6 @@ local VirtualUser       = game:GetService("VirtualUser")
 local StarterGui        = game:GetService("StarterGui")
 local HttpService       = game:GetService("HttpService")
 local Lighting          = game:GetService("Lighting")
-local CoreGui           = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
@@ -29,8 +28,6 @@ local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
 local Executor = { Name = "Unknown", Mobile = false }
 pcall(function()
     if identifyexecutor then Executor.Name = identifyexecutor()
-    elseif KRNL_LOADED then Executor.Name = "KRNL"
-    elseif syn then Executor.Name = "Synapse"
     elseif getexecutorname then Executor.Name = getexecutorname() end
 end)
 pcall(function()
@@ -75,46 +72,37 @@ local Theme = {
 -- CONFIG
 -- ============================================
 local Config = {
-    -- Kill Aura
     KillAura         = false,
     KillAuraRange    = 60,
     KillAuraHitPart  = "HumanoidRootPart",
     KillAuraSpam     = true,
     KillAuraSpeed    = 0.08,
 
-    -- Hitbox
     HitboxExpand     = false,
     HitboxSize       = 15,
     HitboxTransparency = 0.7,
     HitboxTargets    = {},
 
-    -- Auto Farm
     AutoFarm         = false,
-    AutoFarmMethod   = "Teleport",
+    AutoSoulFarm     = false,
     FarmSpeed        = 0.12,
     AttackDist       = 3.5,
     HitsPerTarget    = 3,
     VerifyKill       = true,
 
-    -- Stones
     AutoCollectStones = false,
     AutoPowerStone    = false,
     StonesCollected   = {},
 
-    -- Templars
     AutoTemplarFarm   = false,
     AutoForgeActivate = false,
 
-    -- Astra
     AutoAstraWaves    = false,
     AutoDisintegrate  = false,
 
-    -- Anti-Detection
     RandomTeleportOffset = true,
     ResetVelocity   = true,
-    MaxTeleportPerSecond = 15,
 
-    -- Misc
     AntiAFK         = true,
     SpeedHack       = false,
     SpeedValue      = 50,
@@ -126,19 +114,19 @@ local Config = {
     NoClip          = false,
     InfiniteJump    = false,
 
-    -- Session
     KillCount       = 0,
     SessionStart    = os.time(),
     TeleportCount   = 0,
     DPSWindow       = {},
     CurrentDPS      = 0,
 
-    -- UI
     UIScaleValue    = 1,
+    Collapsed       = false,
+    ExpandedSize    = UDim2.new(0, 400, 0, 580),
+    ExpandedPos     = UDim2.new(0.5, -200, 0.5, -290),
     GUI             = nil,
 }
 
--- Persistent state
 if not getgenv().ThanosSim then
     getgenv().ThanosSim = {
         KillCount      = 0,
@@ -172,15 +160,12 @@ local function getHumanoid()
     return char and char:FindFirstChildOfClass("Humanoid")
 end
 
--- Anti-detection teleport
 local function teleportTo(position)
     local hrp = getHRP()
     if not hrp then return false end
-
     if Config.ResetVelocity then
         pcall(function() hrp.Velocity = Vector3.new(0, 0, 0) end)
     end
-
     local ok = pcall(function()
         if typeof(position) == "CFrame" then
             hrp.CFrame = position
@@ -188,21 +173,13 @@ local function teleportTo(position)
             hrp.CFrame = CFrame.new(position)
         end
     end)
-
-    if ok then
-        Config.TeleportCount = Config.TeleportCount + 1
-    end
+    if ok then Config.TeleportCount = Config.TeleportCount + 1 end
     return ok
 end
 
--- Randomized teleport offset (anti-detection)
 local function getSafeOffset()
     if Config.RandomTeleportOffset then
-        return CFrame.new(
-            math.random(-20, 20) / 10,
-            0,
-            math.random(-20, 20) / 10
-        )
+        return CFrame.new(math.random(-20, 20) / 10, 0, math.random(-20, 20) / 10)
     end
     return CFrame.new(0, 0, 0)
 end
@@ -235,10 +212,8 @@ end
 local function getClosestNPC(filterFn)
     local hrp = getHRP()
     if not hrp then return nil, math.huge end
-
     local closest, closestDist = nil, math.huge
     local myPos = hrp.Position
-
     for _, npc in ipairs(getAllNPCs()) do
         if filterFn and not filterFn(npc) then continue end
         local dist = (npc.hrp.Position - myPos).Magnitude
@@ -282,7 +257,7 @@ local function formatNumber(n)
 end
 
 -- ============================================
--- HITBOX EXPANDER (from Blox Fruits patterns)
+-- HITBOX EXPANDER
 -- ============================================
 local originalSizes = {}
 
@@ -290,7 +265,6 @@ local function expandHitbox(targetModel, size)
     if not targetModel or not targetModel.Parent then return end
     local hrp = targetModel:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-
     if not originalSizes[targetModel] then
         originalSizes[targetModel] = {
             size = hrp.Size,
@@ -298,7 +272,6 @@ local function expandHitbox(targetModel, size)
             cancollide = hrp.CanCollide,
         }
     end
-
     hrp.Size = Vector3.new(size, size, size)
     hrp.Transparency = Config.HitboxTransparency
     hrp.CanCollide = false
@@ -309,13 +282,11 @@ local function restoreHitbox(targetModel)
     if not targetModel or not targetModel.Parent then return end
     local hrp = targetModel:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-
     local orig = originalSizes[targetModel]
     if orig then
         hrp.Size = orig.size
         hrp.Transparency = orig.transparency
         hrp.CanCollide = orig.cancollide
-        hrp.BrickColor = BrickColor.new("Medium stone grey")
         originalSizes[targetModel] = nil
     end
 end
@@ -327,43 +298,29 @@ local function hitboxLoop()
                 for _, npc in ipairs(getAllNPCs()) do
                     expandHitbox(npc.model, Config.HitboxSize)
                 end
-                -- Also expand target models in HitboxTargets
-                for model, _ in pairs(Config.HitboxTargets) do
-                    if model and model.Parent then
-                        expandHitbox(model, Config.HitboxSize)
-                    end
-                end
             end)
             task.wait(0.5)
         end
-        -- Restore all on disable
         for _, npc in ipairs(getAllNPCs()) do
             restoreHitbox(npc.model)
-        end
-        for model, _ in pairs(Config.HitboxTargets) do
-            restoreHitbox(model)
         end
     end)
 end
 
 -- ============================================
--- TOOL EQUIP (from Blox Fruits auto-kill)
+-- TOOL EQUIP
 -- ============================================
 local function equipBestTool()
     local char = getCharacter()
     if not char then return nil end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return nil end
-
-    -- Prefer gauntlet
     for _, tool in ipairs(char:GetChildren()) do
         if tool:IsA("Tool") and tool.Name:lower():find("gauntlet") then
             pcall(function() hum:EquipTool(tool) end)
             return tool
         end
     end
-
-    -- Fallback: any tool
     for _, tool in ipairs(char:GetChildren()) do
         if tool:IsA("Tool") then
             pcall(function() hum:EquipTool(tool) end)
@@ -374,28 +331,24 @@ local function equipBestTool()
 end
 
 -- ============================================
--- KILL AURA (fixed — uses firetouchinterest + Activate)
+-- KILL AURA
 -- ============================================
 local function killAuraHit(npc)
     local char = getCharacter()
     if not char or not npc or not npc.hrp or not npc.humanoid then return end
     if not npc.model.Parent then return end
     if npc.humanoid.Health <= 0 then return end
-
     local hrp = getHRP()
     if not hrp then return end
 
-    -- Equip tool
     local tool = equipBestTool()
 
-    -- Method 1: firetouchinterest (Blox Fruits style)
     if tool and tool:FindFirstChild("Handle") then
         local handle = tool.Handle
         local targetPart = npc.hrp
         if Config.KillAuraHitPart == "Head" then
             targetPart = npc.model:FindFirstChild("Head") or npc.hrp
         end
-
         pcall(function()
             firetouchinterest(handle, targetPart, 0)
             task.wait(0.01)
@@ -403,22 +356,11 @@ local function killAuraHit(npc)
         end)
     end
 
-    -- Method 2: Tool Activate
-    if tool then
-        pcall(function() tool:Activate() end)
-    end
+    if tool then pcall(function() tool:Activate() end) end
+    pcall(function() LocalPlayer:GetMouse() mouse1click() end)
 
-    -- Method 3: Mouse click (some games require this)
-    pcall(function()
-        local mouse = LocalPlayer:GetMouse()
-        mouse1click()
-    end)
-
-    -- Method 4: Direct touch on all body parts (more reliable)
     for _, part in ipairs(npc.model:GetChildren()) do
-        if part:IsA("BasePart") then
-            fireTouch(hrp, part)
-        end
+        if part:IsA("BasePart") then fireTouch(hrp, part) end
     end
 end
 
@@ -441,31 +383,22 @@ local function killAuraLoop()
 end
 
 -- ============================================
--- AUTO FARM (fixed — teleport + verify + attack)
+-- ATTACK / AUTO FARM
 -- ============================================
 local function attackTarget(npc)
     local hrp = getHRP()
     if not hrp or not npc or not npc.hrp or not npc.humanoid then return false end
     if not npc.model.Parent then return false end
     if npc.humanoid.Health <= 0 then return false end
-
     local initialHealth = npc.humanoid.Health
 
-    -- Teleport with offset
     pcall(function()
         hrp.CFrame = npc.hrp.CFrame * CFrame.new(0, 0, Config.AttackDist) * getSafeOffset()
     end)
 
-    -- Equip tool
     local tool = equipBestTool()
-
-    -- Attack loop
     for i = 1, Config.HitsPerTarget do
-        if tool and tool.Parent then
-            pcall(function() tool:Activate() end)
-        end
-
-        -- Fire touch on target
+        if tool and tool.Parent then pcall(function() tool:Activate() end) end
         if tool and tool:FindFirstChild("Handle") then
             pcall(function()
                 firetouchinterest(tool.Handle, npc.hrp, 0)
@@ -473,18 +406,12 @@ local function attackTarget(npc)
                 firetouchinterest(tool.Handle, npc.hrp, 1)
             end)
         end
-
-        pcall(function()
-            local mouse = LocalPlayer:GetMouse()
-            mouse1click()
-        end)
-
+        pcall(function() LocalPlayer:GetMouse() mouse1click() end)
         task.wait(0.03)
     end
 
     task.wait(0.05)
     if not npc.humanoid or not npc.humanoid.Parent then return false end
-
     local damage = initialHealth - npc.humanoid.Health
     if damage > 0 then
         table.insert(Config.DPSWindow, { time = os.clock(), damage = damage })
@@ -502,13 +429,12 @@ end
 local function autoFarmLoop()
     task.spawn(function()
         while Config.AutoFarm do
-            local ok, err = pcall(function()
+            pcall(function()
                 if getCharacter() then
                     local npc = getClosestNPC()
                     if npc and npc.hrp then
                         local initialHealth = npc.humanoid.Health
                         attackTarget(npc)
-
                         if Config.VerifyKill then
                             task.wait(0.1)
                             if npc.humanoid and npc.humanoid.Health <= 0 and initialHealth > 0 then
@@ -521,15 +447,11 @@ local function autoFarmLoop()
                     end
                 end
             end)
-            if not ok then warn("[P] Farm error:", err) end
             task.wait(Config.FarmSpeed)
         end
     end)
 end
 
--- ============================================
--- SOUL FARM (fast, no verification)
--- ============================================
 local function soulFarmLoop()
     task.spawn(function()
         while Config.AutoSoulFarm do
@@ -554,7 +476,7 @@ local function soulFarmLoop()
 end
 
 -- ============================================
--- STONE COLLECTION
+-- STONES
 -- ============================================
 local function autoCollectStonesLoop()
     task.spawn(function()
@@ -568,7 +490,6 @@ local function autoCollectStonesLoop()
                     { name = "Power",   terms = {"power stone", "powerstone"} },
                     { name = "Soul",    terms = {"soul stone", "soulstone"} },
                 }
-
                 for _, stone in ipairs(stoneTerms) do
                     if not Config.StonesCollected[stone.name] then
                         local obj = findObjectByTerms(stone.terms)
@@ -595,9 +516,6 @@ local function autoCollectStonesLoop()
     end)
 end
 
--- ============================================
--- POWERSTONE THING
--- ============================================
 local function autoPowerStoneLoop()
     task.spawn(function()
         while Config.AutoPowerStone do
@@ -623,7 +541,7 @@ local function autoPowerStoneLoop()
 end
 
 -- ============================================
--- TEMPLAR FARM
+-- TEMPLAR / FORGE / ASTRA
 -- ============================================
 local function templarFarmLoop()
     task.spawn(function()
@@ -648,9 +566,6 @@ local function templarFarmLoop()
     end)
 end
 
--- ============================================
--- FORGE ACTIVATION
--- ============================================
 local function autoForgeLoop()
     task.spawn(function()
         while Config.AutoForgeActivate do
@@ -675,9 +590,6 @@ local function autoForgeLoop()
     end)
 end
 
--- ============================================
--- DISINTEGRATE (Astra spawn)
--- ============================================
 local function autoDisintegrateLoop()
     task.spawn(function()
         while Config.AutoDisintegrate do
@@ -699,9 +611,6 @@ local function autoDisintegrateLoop()
     end)
 end
 
--- ============================================
--- ASTRA WAVES
--- ============================================
 local function autoAstraWavesLoop()
     task.spawn(function()
         while Config.AutoAstraWaves do
@@ -726,7 +635,7 @@ local function autoAstraWavesLoop()
 end
 
 -- ============================================
--- ESP
+-- ESP / MISC LOOPS
 -- ============================================
 local function espLoop()
     task.spawn(function()
@@ -740,26 +649,24 @@ local function espLoop()
                         elseif Config.ESPColor == "Gold" then espColor = Theme.Gold
                         elseif Config.ESPColor == "Purple" then espColor = Theme.Purple
                         end
-                        Instance.new("Highlight", npc.model).Name = "P_ESP"
-                        npc.model.P_ESP.FillColor = espColor
-                        npc.model.P_ESP.FillTransparency = 0.55
-                        npc.model.P_ESP.OutlineColor = espColor
-                        npc.model.P_ESP.OutlineTransparency = 0
+                        local hl = Instance.new("Highlight")
+                        hl.Name = "P_ESP"
+                        hl.FillColor = espColor
+                        hl.FillTransparency = 0.55
+                        hl.OutlineColor = espColor
+                        hl.OutlineTransparency = 0
+                        hl.Parent = npc.model
                     end
                 end
             end)
             task.wait(0.5)
         end
-        -- Cleanup
         for _, obj in ipairs(Workspace:GetDescendants()) do
             if obj:IsA("Highlight") and obj.Name == "P_ESP" then obj:Destroy() end
         end
     end)
 end
 
--- ============================================
--- ANTI-AFK
--- ============================================
 local function antiAFKLoop()
     task.spawn(function()
         while Config.AntiAFK do
@@ -772,9 +679,6 @@ local function antiAFKLoop()
     end)
 end
 
--- ============================================
--- MOVEMENT
--- ============================================
 local function movementUpdater()
     task.spawn(function()
         while true do
@@ -793,7 +697,6 @@ local function movementUpdater()
     end)
 end
 
--- Infinite Jump
 local function infiniteJumpLoop()
     task.spawn(function()
         UserInputService.JumpRequest:Connect(function()
@@ -805,7 +708,6 @@ local function infiniteJumpLoop()
     end)
 end
 
--- Full Bright
 local function fullBrightLoop()
     task.spawn(function()
         while true do
@@ -824,7 +726,6 @@ local function fullBrightLoop()
     end)
 end
 
--- NoClip
 local function noClipLoop()
     task.spawn(function()
         while true do
@@ -843,7 +744,6 @@ local function noClipLoop()
     end)
 end
 
--- DPS Calculator
 local function dpsLoop()
     task.spawn(function()
         while true do
@@ -859,7 +759,7 @@ local function dpsLoop()
 end
 
 -- ============================================
--- UI BUILD (VERTICAL SIDEBAR — from GHOSTYHUB pattern)
+-- UI BUILD (HORIZONTAL)
 -- ============================================
 local function createUI()
     local old = PlayerGui:FindFirstChild("P_ThanosSim")
@@ -872,7 +772,7 @@ local function createUI()
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     ScreenGui.Parent = PlayerGui
 
-    -- Floating open button
+    -- Floating open button (used when fully closed)
     local OpenBtn = Instance.new("TextButton")
     OpenBtn.Name = "OpenBtn"
     OpenBtn.Size = UDim2.new(0, 50, 0, 50)
@@ -889,11 +789,11 @@ local function createUI()
     obStroke.Color = Theme.Purple
     obStroke.Thickness = 2
 
-    -- Main frame (vertical layout: sidebar left, content right)
+    -- Main frame
     local Main = Instance.new("Frame")
     Main.Name = "Main"
-    Main.Size = UDim2.new(0, 380, 0, 580)
-    Main.Position = UDim2.new(0.5, -190, 0.5, -290)
+    Main.Size = Config.ExpandedSize
+    Main.Position = Config.ExpandedPos
     Main.BackgroundColor3 = Theme.Bg
     Main.BorderSizePixel = 0
     Main.Active = true
@@ -908,26 +808,23 @@ local function createUI()
     mainGrad.Color = ColorSequence.new(Theme.Bg, Theme.Panel)
     mainGrad.Rotation = 90
 
-    -- UIScale for shrink/resize
     local UIScale = Instance.new("UIScale")
     UIScale.Scale = 1
     UIScale.Parent = Main
 
-    -- UISizeConstraint to prevent off-screen
     local sizeConstraint = Instance.new("UISizeConstraint")
-    sizeConstraint.MinSize = Vector2.new(280, 420)
-    sizeConstraint.MaxSize = Vector2.new(500, 800)
+    sizeConstraint.MinSize = Vector2.new(280, 300)
+    sizeConstraint.MaxSize = Vector2.new(600, 800)
     sizeConstraint.Parent = Main
 
-    -- Title bar
+    -- ========== TITLE BAR ==========
     local TitleBar = Instance.new("Frame")
     TitleBar.Name = "TitleBar"
-    TitleBar.Size = UDim2.new(1, 0, 0, 52)
+    TitleBar.Size = UDim2.new(1, 0, 0, 50)
     TitleBar.BackgroundColor3 = Theme.PanelLight
     TitleBar.BorderSizePixel = 0
     TitleBar.Parent = Main
     Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 16)
-    -- Cover bottom corners
     local cover = Instance.new("Frame")
     cover.Size = UDim2.new(1, 0, 0, 14)
     cover.Position = UDim2.new(0, 0, 1, -14)
@@ -940,8 +837,8 @@ local function createUI()
 
     -- Logo
     local Logo = Instance.new("Frame")
-    Logo.Size = UDim2.new(0, 34, 0, 34)
-    Logo.Position = UDim2.new(0, 12, 0.5, -17)
+    Logo.Size = UDim2.new(0, 32, 0, 32)
+    Logo.Position = UDim2.new(0, 12, 0.5, -16)
     Logo.BackgroundColor3 = Theme.Gold
     Logo.BorderSizePixel = 0
     Logo.Parent = TitleBar
@@ -955,12 +852,12 @@ local function createUI()
     logoLabel.Text = "P"
     logoLabel.TextColor3 = Theme.Bg
     logoLabel.Font = Enum.Font.GothamBlack
-    logoLabel.TextSize = 18
+    logoLabel.TextSize = 17
 
     -- Title text
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, -130, 0, 18)
-    titleLabel.Position = UDim2.new(0, 54, 0, 10)
+    titleLabel.Size = UDim2.new(1, -180, 0, 16)
+    titleLabel.Position = UDim2.new(0, 52, 0, 10)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = "THANOS SIMULATOR"
     titleLabel.TextColor3 = Theme.Text
@@ -970,20 +867,20 @@ local function createUI()
     titleLabel.Parent = TitleBar
 
     local subtitleLabel = Instance.new("TextLabel")
-    subtitleLabel.Size = UDim2.new(1, -130, 0, 14)
-    subtitleLabel.Position = UDim2.new(0, 54, 0, 28)
+    subtitleLabel.Size = UDim2.new(1, -180, 0, 12)
+    subtitleLabel.Position = UDim2.new(0, 52, 0, 26)
     subtitleLabel.BackgroundTransparency = 1
-    subtitleLabel.Text = "P edition · vertical"
+    subtitleLabel.Text = "P edition · horizontal"
     subtitleLabel.TextColor3 = Theme.TextGold
     subtitleLabel.Font = Enum.Font.Gotham
     subtitleLabel.TextSize = 10
     subtitleLabel.TextXAlignment = Enum.TextXAlignment.Left
     subtitleLabel.Parent = TitleBar
 
-    -- Resize buttons
+    -- Resize −
     local ResizeMinus = Instance.new("TextButton")
     ResizeMinus.Size = UDim2.new(0, 24, 0, 24)
-    ResizeMinus.Position = UDim2.new(1, -110, 0.5, -12)
+    ResizeMinus.Position = UDim2.new(1, -140, 0.5, -12)
     ResizeMinus.BackgroundColor3 = Theme.Card
     ResizeMinus.Text = "−"
     ResizeMinus.TextColor3 = Theme.TextDim
@@ -994,9 +891,10 @@ local function createUI()
     Instance.new("UICorner", ResizeMinus).CornerRadius = UDim.new(0, 12)
     Instance.new("UIStroke", ResizeMinus).Color = Theme.BorderDim
 
+    -- Resize +
     local ResizePlus = Instance.new("TextButton")
     ResizePlus.Size = UDim2.new(0, 24, 0, 24)
-    ResizePlus.Position = UDim2.new(1, -82, 0.5, -12)
+    ResizePlus.Position = UDim2.new(1, -112, 0.5, -12)
     ResizePlus.BackgroundColor3 = Theme.Card
     ResizePlus.Text = "+"
     ResizePlus.TextColor3 = Theme.TextDim
@@ -1007,33 +905,10 @@ local function createUI()
     Instance.new("UICorner", ResizePlus).CornerRadius = UDim.new(0, 12)
     Instance.new("UIStroke", ResizePlus).Color = Theme.BorderDim
 
-    -- Close
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Size = UDim2.new(0, 26, 0, 26)
-    CloseBtn.Position = UDim2.new(1, -38, 0.5, -13)
-    CloseBtn.BackgroundColor3 = Theme.Crimson
-    CloseBtn.Text = "×"
-    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.TextSize = 18
-    CloseBtn.AutoButtonColor = false
-    CloseBtn.Parent = TitleBar
-    Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 13)
-
-    CloseBtn.MouseButton1Click:Connect(function()
-        TweenService:Create(Main, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
-            Size = UDim2.new(0, 0, 0, 0),
-            Position = UDim2.new(0.5, 0, 0.5, 0),
-        }):Play()
-        task.wait(0.2)
-        ScreenGui.Enabled = false
-        OpenBtn.Visible = true
-    end)
-
-    -- Minimize
+    -- Minimize (collapse/expand)
     local MinBtn = Instance.new("TextButton")
-    MinBtn.Size = UDim2.new(0, 26, 0, 26)
-    MinBtn.Position = UDim2.new(1, -68, 0.5, -13)
+    MinBtn.Size = UDim2.new(0, 24, 0, 24)
+    MinBtn.Position = UDim2.new(1, -84, 0.5, -12)
     MinBtn.BackgroundColor3 = Theme.GoldDim
     MinBtn.Text = "–"
     MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1041,108 +916,43 @@ local function createUI()
     MinBtn.TextSize = 16
     MinBtn.AutoButtonColor = false
     MinBtn.Parent = TitleBar
-    Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 13)
+    Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 12)
 
-    MinBtn.MouseButton1Click:Connect(function()
-        Main.Visible = not Main.Visible
-        OpenBtn.Visible = not Main.Visible
-    end)
+    -- Close
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Size = UDim2.new(0, 24, 0, 24)
+    CloseBtn.Position = UDim2.new(1, -52, 0.5, -12)
+    CloseBtn.BackgroundColor3 = Theme.Crimson
+    CloseBtn.Text = "×"
+    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.TextSize = 17
+    CloseBtn.AutoButtonColor = false
+    CloseBtn.Parent = TitleBar
+    Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 12)
 
-    OpenBtn.MouseButton1Click:Connect(function()
-        OpenBtn.Visible = false
-        ScreenGui.Enabled = true
-        Main.Visible = true
-        Main.Size = UDim2.new(0, 0, 0, 0)
-        Main.Position = UDim2.new(0.5, 0, 0.5, 0)
-        TweenService:Create(Main, TweenInfo.new(0.25, Enum.EasingStyle.Back), {
-            Size = UDim2.new(0, 380, 0, 580),
-            Position = UDim2.new(0.5, -190, 0.5, -290),
-        }):Play()
-    end)
+    -- ========== TAB BAR (HORIZONTAL) ==========
+    local TabBar = Instance.new("ScrollingFrame")
+    TabBar.Name = "TabBar"
+    TabBar.Size = UDim2.new(1, -20, 0, 34)
+    TabBar.Position = UDim2.new(0, 10, 0, 56)
+    TabBar.BackgroundTransparency = 1
+    TabBar.BorderSizePixel = 0
+    TabBar.ScrollBarThickness = 0
+    TabBar.CanvasSize = UDim2.new(0, 0, 0, 0)
+    TabBar.ScrollingDirection = Enum.ScrollingDirection.X
+    TabBar.Parent = Main
 
-    -- Resize handlers
-    ResizeMinus.MouseButton1Click:Connect(function()
-        Config.UIScaleValue = math.max(0.5, Config.UIScaleValue - 0.1)
-        TweenService:Create(UIScale, TweenInfo.new(0.15), { Scale = Config.UIScaleValue }):Play()
-    end)
+    local tabList = Instance.new("UIListLayout", TabBar)
+    tabList.FillDirection = Enum.FillDirection.Horizontal
+    tabList.Padding = UDim.new(0, 4)
+    tabList.SortOrder = Enum.SortOrder.LayoutOrder
 
-    ResizePlus.MouseButton1Click:Connect(function()
-        Config.UIScaleValue = math.min(1.8, Config.UIScaleValue + 0.1)
-        TweenService:Create(UIScale, TweenInfo.new(0.15), { Scale = Config.UIScaleValue }):Play()
-    end)
-
-    -- Drag with clamping
-    local dragging, dragStart, startPos
-    local function clampPos(pos, obj)
-        local vp = Workspace.CurrentCamera.ViewportSize
-        local size = obj.AbsoluteSize
-        local x = math.clamp(pos.X.Offset, -size.X + 60, vp.X - 60)
-        local y = math.clamp(pos.Y.Offset, 0, vp.Y - 40)
-        return UDim2.new(pos.X.Scale, x, pos.Y.Scale, y)
-    end
-
-    TitleBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-           or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = Main.Position
-        end
-    end)
-    TitleBar.InputChanged:Connect(function(input)
-        if not dragging then return end
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-           or input.UserInputType == Enum.UserInputType.Touch then
-            local delta = input.Position - dragStart
-            Main.Position = clampPos(UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y), Main)
-        end
-    end)
-    TitleBar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-           or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if not dragging then return end
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-           or input.UserInputType == Enum.UserInputType.Touch then
-            local delta = input.Position - dragStart
-            Main.Position = clampPos(UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y), Main)
-        end
-    end)
-
-    -- ============================================
-    -- VERTICAL SIDEBAR + CONTENT
-    -- ============================================
-
-    -- Sidebar (vertical tabs on left)
-    local Sidebar = Instance.new("Frame")
-    Sidebar.Name = "Sidebar"
-    Sidebar.Size = UDim2.new(0, 90, 1, -52 - 46)
-    Sidebar.Position = UDim2.new(0, 0, 0, 52)
-    Sidebar.BackgroundColor3 = Theme.Panel
-    Sidebar.BorderSizePixel = 0
-    Sidebar.Parent = Main
-    -- Bottom corners only
-    local sidebarCorner = Instance.new("UICorner", Sidebar)
-    sidebarCorner.CornerRadius = UDim.new(0, 12)
-
-    local sidebarList = Instance.new("UIListLayout", Sidebar)
-    sidebarList.Padding = UDim.new(0, 4)
-    sidebarList.SortOrder = Enum.SortOrder.LayoutOrder
-    sidebarList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-    local sidebarPad = Instance.new("UIPadding", Sidebar)
-    sidebarPad.PaddingTop = UDim.new(0, 8)
-
-    -- Content area (right of sidebar)
+    -- ========== CONTENT ==========
     local Content = Instance.new("ScrollingFrame")
     Content.Name = "Content"
-    Content.Size = UDim2.new(1, -100, 1, -52 - 56)
-    Content.Position = UDim2.new(0, 96, 0, 58)
+    Content.Size = UDim2.new(1, -20, 1, -100 - 56)
+    Content.Position = UDim2.new(0, 10, 0, 96)
     Content.BackgroundColor3 = Theme.Panel
     Content.BorderSizePixel = 0
     Content.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -1161,7 +971,7 @@ local function createUI()
     contentPad.PaddingLeft = UDim.new(0, 8)
     contentPad.PaddingRight = UDim.new(0, 8)
 
-    -- Footer
+    -- ========== FOOTER ==========
     local Footer = Instance.new("Frame")
     Footer.Name = "Footer"
     Footer.Size = UDim2.new(1, -16, 0, 44)
@@ -1200,7 +1010,109 @@ local function createUI()
     StatusDot.Parent = Footer
     Instance.new("UICorner", StatusDot).CornerRadius = UDim.new(1, 0)
 
-    -- Tab system
+    -- ========== COLLAPSE / MINIMIZE ==========
+    local function setCollapsed(collapsed)
+        Config.Collapsed = collapsed
+        if collapsed then
+            -- Store current state
+            Config.ExpandedSize = Main.Size
+            Config.ExpandedPos = Main.Position
+            TabBar.Visible = false
+            Content.Visible = false
+            Footer.Visible = false
+            subtitleLabel.Text = "click – to expand"
+            TweenService:Create(Main, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+                Size = UDim2.new(0, 260, 0, 50),
+            }):Play()
+        else
+            TabBar.Visible = true
+            Content.Visible = true
+            Footer.Visible = true
+            subtitleLabel.Text = "P edition · horizontal"
+            TweenService:Create(Main, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+                Size = Config.ExpandedSize,
+            }):Play()
+        end
+    end
+
+    MinBtn.MouseButton1Click:Connect(function()
+        setCollapsed(not Config.Collapsed)
+    end)
+
+    -- Close = full hide, floating P button
+    CloseBtn.MouseButton1Click:Connect(function()
+        TweenService:Create(Main, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
+            Size = UDim2.new(0, 0, 0, 0),
+            Position = UDim2.new(0.5, 0, 0.5, 0),
+        }):Play()
+        task.wait(0.2)
+        ScreenGui.Enabled = false
+        OpenBtn.Visible = true
+    end)
+
+    OpenBtn.MouseButton1Click:Connect(function()
+        OpenBtn.Visible = false
+        ScreenGui.Enabled = true
+        Main.Visible = true
+        Config.Collapsed = false
+        TabBar.Visible = true
+        Content.Visible = true
+        Footer.Visible = true
+        Main.Size = UDim2.new(0, 0, 0, 0)
+        Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+        TweenService:Create(Main, TweenInfo.new(0.25, Enum.EasingStyle.Back), {
+            Size = Config.ExpandedSize,
+            Position = Config.ExpandedPos,
+        }):Play()
+    end)
+
+    ResizeMinus.MouseButton1Click:Connect(function()
+        Config.UIScaleValue = math.max(0.5, Config.UIScaleValue - 0.1)
+        TweenService:Create(UIScale, TweenInfo.new(0.15), { Scale = Config.UIScaleValue }):Play()
+    end)
+
+    ResizePlus.MouseButton1Click:Connect(function()
+        Config.UIScaleValue = math.min(1.8, Config.UIScaleValue + 0.1)
+        TweenService:Create(UIScale, TweenInfo.new(0.15), { Scale = Config.UIScaleValue }):Play()
+    end)
+
+    -- ========== DRAG ==========
+    local dragging, dragStart, startPos
+    local function clampPos(pos, obj)
+        local vp = Workspace.CurrentCamera.ViewportSize
+        local size = obj.AbsoluteSize
+        local x = math.clamp(pos.X.Offset, -size.X + 60, vp.X - 60)
+        local y = math.clamp(pos.Y.Offset, 0, vp.Y - 40)
+        return UDim2.new(pos.X.Scale, x, pos.Y.Scale, y)
+    end
+
+    TitleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+           or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = Main.Position
+        end
+    end)
+    local function doDrag(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+           or input.UserInputType == Enum.UserInputType.Touch then
+            local delta = input.Position - dragStart
+            Main.Position = clampPos(UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y), Main)
+        end
+    end
+    TitleBar.InputChanged:Connect(doDrag)
+    UserInputService.InputChanged:Connect(doDrag)
+    TitleBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+           or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    -- ========== TAB SYSTEM ==========
     local Tabs = {}
     local ActiveTab = nil
 
@@ -1210,10 +1122,12 @@ local function createUI()
                 tab.Content.Visible = true
                 TweenService:Create(tab.Button, TweenInfo.new(0.12), { BackgroundColor3 = Theme.PurpleDeep }):Play()
                 tab.Button.TextColor3 = Theme.TextGold
+                tab.Indicator.Visible = true
             else
                 tab.Content.Visible = false
                 TweenService:Create(tab.Button, TweenInfo.new(0.12), { BackgroundColor3 = Theme.Card }):Play()
                 tab.Button.TextColor3 = Theme.TextDim
+                tab.Indicator.Visible = false
             end
         end
         ActiveTab = name
@@ -1222,17 +1136,27 @@ local function createUI()
     local function createTab(name, icon, order)
         local btn = Instance.new("TextButton")
         btn.Name = name .. "Tab"
-        btn.Size = UDim2.new(0, 76, 0, 36)
+        btn.Size = UDim2.new(0, 76, 0, 30)
         btn.BackgroundColor3 = Theme.Card
         btn.Text = icon .. " " .. name
         btn.TextColor3 = Theme.TextDim
         btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 10
+        btn.TextSize = 11
         btn.AutoButtonColor = false
         btn.LayoutOrder = order
-        btn.Parent = Sidebar
+        btn.Parent = TabBar
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
         Instance.new("UIStroke", btn).Color = Theme.BorderDim
+        Instance.new("UIStroke", btn).Transparency = 0.4
+
+        local indicator = Instance.new("Frame")
+        indicator.Size = UDim2.new(0.6, 0, 0, 2)
+        indicator.Position = UDim2.new(0.2, 0, 1, -3)
+        indicator.BackgroundColor3 = Theme.Gold
+        indicator.BorderSizePixel = 0
+        indicator.Visible = false
+        indicator.Parent = btn
+        Instance.new("UICorner", indicator).CornerRadius = UDim.new(1, 0)
 
         local content = Instance.new("Frame")
         content.Name = name .. "Content"
@@ -1258,11 +1182,11 @@ local function createUI()
 
         btn.MouseButton1Click:Connect(function() switchTab(name) end)
 
-        Tabs[name] = { Button = btn, Content = content }
+        Tabs[name] = { Button = btn, Content = content, Indicator = indicator }
         return content
     end
 
-    -- Widgets
+    -- ========== WIDGETS ==========
     local function createSection(parent, title, order)
         local f = Instance.new("Frame")
         f.Size = UDim2.new(1, 0, 0, 20)
@@ -1452,22 +1376,18 @@ local function createUI()
                 updateFromInput(input)
             end
         end)
-        track.InputChanged:Connect(function(input)
+        local function sliderDrag(input)
             if draggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement
                or input.UserInputType == Enum.UserInputType.Touch) then
                 updateFromInput(input)
             end
-        end)
+        end
+        track.InputChanged:Connect(sliderDrag)
+        UserInputService.InputChanged:Connect(sliderDrag)
         track.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1
                or input.UserInputType == Enum.UserInputType.Touch then
                 draggingSlider = false
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(input)
-            if draggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement
-               or input.UserInputType == Enum.UserInputType.Touch) then
-                updateFromInput(input)
             end
         end)
 
@@ -1509,8 +1429,8 @@ local function createUI()
     createSlider(CombatTab, "Hitbox Size", 5, 50, 15, function(v)
         Config.HitboxSize = v
     end, 8)
-    createSlider(CombatTab, "Hitbox Transparency", 0, 1, 0.7, function(v)
-        Config.HitboxTransparency = 1 - v
+    createSlider(CombatTab, "Hitbox Transparency", 0, 100, 70, function(v)
+        Config.HitboxTransparency = v / 100
     end, 9)
 
     createSection(CombatTab, "Auto Farm", 10)
@@ -1694,7 +1614,6 @@ end
 -- ============================================
 createUI()
 
--- Start base loops
 antiAFKLoop()
 movementUpdater()
 infiniteJumpLoop()
@@ -1723,8 +1642,8 @@ end)
 
 StarterGui:SetCore("SendNotification", {
     Title = "P | Thanos Simulator",
-    Text = "Vertical UI loaded. Kill aura + hitbox ready.",
+    Text = "Horizontal UI loaded. Tap – to minimize.",
     Duration = 5,
 })
 
-print("[P] Vertical build loaded. Executor:", Executor.Name, "| Mobile:", Executor.Mobile)
+print("[P] Horizontal build loaded. Executor:", Executor.Name)

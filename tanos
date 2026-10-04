@@ -1,34 +1,25 @@
 -- ============================================
 -- Infinity Gauntlet | Thanos Simulator
--- "P" Edition — Hidden Wide UI · v4.1
--- Full Drag · Auto-Collect · Full Weapons
+-- "P" Edition — Hidden Wide UI · v4.2
+-- Scrollable · Full Drag · Auto-Collect
 -- Delta Executor (Mobile) Compatible
 -- ============================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
--- ============================================
--- SERVICES
--- ============================================
 local Players           = game:GetService("Players")
-local RunService        = game:GetService("RunService")
 local UserInputService  = game:GetService("UserInputService")
 local TeleportService   = game:GetService("TeleportService")
 local TweenService      = game:GetService("TweenService")
 local Workspace         = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualUser       = game:GetService("VirtualUser")
 local StarterGui        = game:GetService("StarterGui")
-local HttpService       = game:GetService("HttpService")
 local Lighting          = game:GetService("Lighting")
 local CoreGui           = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
 
--- ============================================
--- EXECUTOR DETECTION
--- ============================================
 local Executor = { Name = "Unknown", Mobile = false }
 pcall(function()
     if identifyexecutor then Executor.Name = identifyexecutor()
@@ -41,18 +32,12 @@ pcall(function()
     Executor.Mobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 end)
 
--- ============================================
--- FORWARD DECLARATIONS
--- ============================================
 local getCharacter, getHRP, getHumanoid, teleportTo, getSafeOffset
 local isValidNPC, getAllNPCs, getClosestNPC, equipBestTool
 local fireTouch, findObjectByTerms, fmt, formatTime, getOwnedItems
 local checkRequirements, autoEquipBest, notify
 local getNPCsByName, getItemCount, findItem
 
--- ============================================
--- THEME
--- ============================================
 local Theme = {
     Bg          = Color3.fromRGB(12, 10, 20),
     BgDeep      = Color3.fromRGB(8, 6, 15),
@@ -77,6 +62,7 @@ local Theme = {
     EmeraldDim  = Color3.fromRGB(35, 120, 80),
     Cyan        = Color3.fromRGB(100, 200, 240),
     Orange      = Color3.fromRGB(255, 135, 55),
+    Pink        = Color3.fromRGB(255, 90, 180),
     Blue        = Color3.fromRGB(80, 120, 220),
 
     Text        = Color3.fromRGB(240, 235, 255),
@@ -90,182 +76,65 @@ local Theme = {
     StoneMind    = Color3.fromRGB(255, 210, 40),
     StonePower   = Color3.fromRGB(180, 60, 220),
     StoneSoul    = Color3.fromRGB(255, 130, 40),
-
-    Shadow      = Color3.fromRGB(0, 0, 0),
 }
 
--- ============================================
--- CONFIG
--- ============================================
 local Config = {
-    -- Auto Kill
-    AutoKill         = false,
-    KillRange        = 300,
-    ThrowHeight      = 50,
-    KillDelay        = 0.05,
-    KillLockTimeout  = 3,
-    HitboxSize       = 15,
-    HitboxTransparency = 0.7,
-    FreezeTarget     = true,
-    KillAura         = false,
-    AuraRange        = 55,
-    AuraSpeed        = 0.08,
+    AutoKill = false, KillRange = 300, ThrowHeight = 50,
+    KillDelay = 0.05, KillLockTimeout = 3, HitboxSize = 15,
+    HitboxTransparency = 0.7, FreezeTarget = true,
+    KillAura = false, AuraRange = 55, AuraSpeed = 0.08,
 
-    -- Auto Farm
-    AutoFarm         = false,
-    FarmSpeed        = 0.1,
-    AutoSoulFarm     = false,
+    AutoFarm = false, FarmSpeed = 0.1, AutoSoulFarm = false,
 
-    -- Auto Collect
-    AutoCollectStones = false,
-    AutoPowerStone    = false,
-    AutoCollectFrost  = false,
-    AutoCollectLunar  = false,
-    AutoCollectCelestial = false,
-    StonesCollected   = {},
+    AutoCollectStones = false, AutoPowerStone = false,
+    AutoCollectFrost = false, AutoCollectLunar = false,
+    AutoCollectCelestial = false, StonesCollected = {},
 
-    -- Auto Upgrade
-    AutoUpgradeGauntlet = false,
-    AutoKillForUpgrade  = false,
+    AutoUpgradeGauntlet = false, AutoKillForUpgrade = false,
 
-    -- Templar / Forge
-    AutoTemplarFarm   = false,
-    AutoForgeActivate = false,
-    AutoAstraWaves    = false,
-    AutoDisintegrate  = false,
+    AutoTemplarFarm = false, AutoForgeActivate = false,
+    AutoAstraWaves = false, AutoDisintegrate = false,
 
-    -- Character
-    AntiAFK         = true,
-    SpeedHack       = false,
-    SpeedValue      = 50,
-    JumpPower       = false,
-    JumpValue       = 100,
-    ESP             = false,
-    ESPColor        = "Crimson",
-    FullBright      = false,
-    NoClip          = false,
-    InfiniteJump    = false,
+    AntiAFK = true, SpeedHack = false, SpeedValue = 50,
+    JumpPower = false, JumpValue = 100, ESP = false,
+    ESPColor = "Crimson", FullBright = false, NoClip = false,
+    InfiniteJump = false,
 
-    -- Hacks
-    GodMode         = false,
-    Fly             = false,
-    FlySpeed        = 60,
-    AntiFling       = false,
-    AutoParry       = false,
-    AutoEquipBest   = true,
+    GodMode = false, Fly = false, FlySpeed = 60,
+    AntiFling = false, AutoParry = false, AutoEquipBest = true,
 
-    -- Session
-    KillCount       = 0,
-    FragmentCount   = 0,
-    SessionStart    = os.time(),
-    TeleportCount   = 0,
-    DPSWindow       = {},
-    CurrentDPS      = 0,
-    DPSPeak         = 0,
+    KillCount = 0, FragmentCount = 0, SessionStart = os.time(),
+    TeleportCount = 0, DPSWindow = {}, CurrentDPS = 0, DPSPeak = 0,
 
-    -- UI
-    UIScaleValue    = 1,
-    Collapsed       = false,
-    CurrentTarget   = nil,
-    LastKillTime    = 0,
-    FixedMousePos   = Vector2.new(0, 0),
-    FixedMouseLock  = false,
-    ActivePage      = "Home",
-    UIPosition      = UDim2.new(0.5, -280, 0.5, -180),
+    UIScaleValue = 1, Collapsed = false, CurrentTarget = nil,
+    LastKillTime = 0, FixedMousePos = Vector2.new(0, 0),
+    FixedMouseLock = false, ActivePage = "Home",
 }
 
 if not getgenv().ThanosSim then
     getgenv().ThanosSim = {
-        KillCount      = 0,
-        SessionKills   = 0,
-        FragmentCount  = 0,
-        AstraWave      = 0,
-        StonesCollected = {},
-        InitTimestamp  = os.time(),
-        WeaponsOwned   = {},
-        FrostFragments = 0,
-        LunarFragment  = false,
-        CelestialFragment = false,
-        HeartOfYmir    = false,
+        KillCount = 0, SessionKills = 0, FragmentCount = 0,
+        AstraWave = 0, StonesCollected = {},
+        InitTimestamp = os.time(), WeaponsOwned = {},
+        FrostFragments = 0, LunarFragment = false,
+        CelestialFragment = false, HeartOfYmir = false,
         CrownOfBlackFire = false,
     }
 end
 local State = getgenv().ThanosSim
 
--- ============================================
--- WEAPON DATABASE
--- ============================================
 local WeaponDB = {
-    {
-        name = "Infinity Gauntlet",
-        requirements = { kills = 0, fragments = 0, stones = {"Space Stone"}, items = {} },
-        description = "Base gauntlet. Collect Space Stone for teleport.",
-        color = Theme.StoneSpace,
-        autoEquipPriority = 5,
-    },
-    {
-        name = "Upgraded Infinity Gauntlet",
-        requirements = { kills = 200000, fragments = 0, stones = {}, items = {"Infinity Gauntlet"} },
-        description = "200k kills. Upgrade at Celestial Forge in Catacombs.",
-        color = Theme.Purple,
-        autoEquipPriority = 10,
-    },
-    {
-        name = "Stormbreaker",
-        requirements = { kills = 750, fragments = 100, stones = {}, items = {} },
-        description = "750 kills + 100 fragments. Craft at Forge.",
-        color = Theme.Gold,
-        autoEquipPriority = 7,
-    },
-    {
-        name = "Mjolnir",
-        requirements = { kills = 0, fragments = 350, stones = {}, items = {"Stormbreaker"} },
-        description = "350 fragments. Requires Stormbreaker first.",
-        color = Theme.Cyan,
-        autoEquipPriority = 8,
-    },
-    {
-        name = "Surtur's Sword",
-        requirements = { kills = 0, fragments = 0, stones = {}, items = {"Heart of Ymir", "Hadron Enforcer", "Crown of Black Fire"} },
-        description = "Heart of Ymir + Hadron Enforcer + Crown of Black Fire. Kill Surtur.",
-        color = Theme.Crimson,
-        autoEquipPriority = 9,
-    },
-    {
-        name = "Hadron Enforcer",
-        requirements = { kills = 0, fragments = 0, stones = {}, items = {"Lunar Fragment", "Celestial Fragment"} },
-        description = "Craft in Lunar World. Requires Lunar + Celestial Fragment.",
-        color = Theme.Emerald,
-        autoEquipPriority = 6,
-    },
-    {
-        name = "Cosmi-Rod",
-        requirements = { kills = 0, fragments = 0, stones = {}, items = {} },
-        description = "Kill Servant of Celestial in Catacombs.",
-        color = Theme.Orange,
-        autoEquipPriority = 4,
-    },
-    {
-        name = "Secret Weapon",
-        requirements = { kills = 800, fragments = 0, stones = {}, items = {} },
-        description = "800 kills. Find at secret location.",
-        color = Theme.Pink or Theme.Purple,
-        autoEquipPriority = 3,
-    },
-    {
-        name = "Mechanical Gloves",
-        requirements = { kills = 0, fragments = 0, stones = {}, items = {"Infinity Gauntlet"} },
-        description = "Use Classic Snap on Doom boss.",
-        color = Theme.Blue,
-        autoEquipPriority = 2,
-    },
+    { name = "Infinity Gauntlet", requirements = { kills = 0, fragments = 0, stones = {"Space Stone"}, items = {} }, description = "Base gauntlet.", color = Theme.StoneSpace, autoEquipPriority = 5 },
+    { name = "Upgraded Infinity Gauntlet", requirements = { kills = 200000, fragments = 0, stones = {}, items = {"Infinity Gauntlet"} }, description = "200k kills.", color = Theme.Purple, autoEquipPriority = 10 },
+    { name = "Stormbreaker", requirements = { kills = 750, fragments = 100, stones = {}, items = {} }, description = "750 kills + 100 frags.", color = Theme.Gold, autoEquipPriority = 7 },
+    { name = "Mjolnir", requirements = { kills = 0, fragments = 350, stones = {}, items = {"Stormbreaker"} }, description = "350 fragments.", color = Theme.Cyan, autoEquipPriority = 8 },
+    { name = "Surtur's Sword", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Heart of Ymir", "Hadron Enforcer", "Crown of Black Fire"} }, description = "3 items needed.", color = Theme.Crimson, autoEquipPriority = 9 },
+    { name = "Hadron Enforcer", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Lunar Fragment", "Celestial Fragment"} }, description = "Lunar + Celestial frag.", color = Theme.Emerald, autoEquipPriority = 6 },
+    { name = "Cosmi-Rod", requirements = { kills = 0, fragments = 0, stones = {}, items = {} }, description = "Kill Servant of Celestial.", color = Theme.Orange, autoEquipPriority = 4 },
+    { name = "Secret Weapon", requirements = { kills = 800, fragments = 0, stones = {}, items = {} }, description = "800 kills.", color = Theme.Pink, autoEquipPriority = 3 },
+    { name = "Mechanical Gloves", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Infinity Gauntlet"} }, description = "Classic Snap on Doom.", color = Theme.Blue, autoEquipPriority = 2 },
 }
--- Add Pink alias if missing
-if not Theme.Pink then Theme.Pink = Color3.fromRGB(255, 90, 180) end
 
--- ============================================
--- UTILITY FUNCTIONS
--- ============================================
 getCharacter = function()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
@@ -289,11 +158,8 @@ teleportTo = function(position)
     if not hrp then return false end
     pcall(function() hrp.Velocity = Vector3.new(0, 0, 0) end)
     local ok = pcall(function()
-        if typeof(position) == "CFrame" then
-            hrp.CFrame = position
-        elseif typeof(position) == "Vector3" then
-            hrp.CFrame = CFrame.new(position)
-        end
+        if typeof(position) == "CFrame" then hrp.CFrame = position
+        elseif typeof(position) == "Vector3" then hrp.CFrame = CFrame.new(position) end
     end)
     if ok then Config.TeleportCount = Config.TeleportCount + 1 end
     return ok
@@ -333,9 +199,7 @@ end
 getNPCsByName = function(namePart)
     local result = {}
     for _, npc in ipairs(getAllNPCs()) do
-        if npc.name:lower():find(namePart:lower()) then
-            table.insert(result, npc)
-        end
+        if npc.name:lower():find(namePart:lower()) then table.insert(result, npc) end
     end
     return result
 end
@@ -421,12 +285,6 @@ getItemCount = function(itemName)
             if obj.Name:lower():find(itemName:lower()) then count = count + 1 end
         end
     end
-    local char = getCharacter()
-    if char then
-        for _, obj in ipairs(char:GetChildren()) do
-            if obj.Name:lower():find(itemName:lower()) then count = count + 1 end
-        end
-    end
     return count
 end
 
@@ -461,39 +319,31 @@ getOwnedItems = function()
     return items
 end
 
--- ============================================
--- REQUIREMENT CHECKER
--- ============================================
 checkRequirements = function(weaponName)
     local weapon = nil
     for _, w in ipairs(WeaponDB) do
         if w.name == weaponName then weapon = w; break end
     end
     if not weapon then return false, {"Unknown weapon"} end
-
     local missing = {}
-
     if weapon.requirements.kills > 0 then
         local currentKills = State.KillCount or 0
         if currentKills < weapon.requirements.kills then
             table.insert(missing, string.format("Kills: %s / %s", fmt(currentKills), fmt(weapon.requirements.kills)))
         end
     end
-
     if weapon.requirements.fragments > 0 then
         local currentFrags = State.FragmentCount or 0
         if currentFrags < weapon.requirements.fragments then
-            table.insert(missing, string.format("Fragments: %s / %s", fmt(currentFrags), fmt(weapon.requirements.fragments)))
+            table.insert(missing, string.format("Frags: %s / %s", fmt(currentFrags), fmt(weapon.requirements.fragments)))
         end
     end
-
     for _, stone in ipairs(weapon.requirements.stones or {}) do
         local stoneKey = stone:gsub(" Stone", "")
         if not Config.StonesCollected[stoneKey] and not State.StonesCollected[stoneKey] then
             table.insert(missing, "Missing: " .. stone)
         end
     end
-
     local ownedItems = getOwnedItems()
     for _, item in ipairs(weapon.requirements.items or {}) do
         local found = false
@@ -504,23 +354,17 @@ checkRequirements = function(weaponName)
         end
         if not found then table.insert(missing, "Missing: " .. item) end
     end
-
     return #missing == 0, missing
 end
 
--- ============================================
--- AUTO EQUIP BEST
--- ============================================
 autoEquipBest = function()
     if not Config.AutoEquipBest then return end
     local char = getCharacter()
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
-
     local bestPriority = -1
     local bestTool = nil
-
     local function checkTool(tool)
         for _, weapon in ipairs(WeaponDB) do
             if tool.Name:lower():find(weapon.name:lower()) or weapon.name:lower():find(tool.Name:lower()) then
@@ -531,12 +375,8 @@ autoEquipBest = function()
                 return
             end
         end
-        if bestPriority < 1 then
-            bestPriority = 1
-            bestTool = tool
-        end
+        if bestPriority < 1 then bestPriority = 1; bestTool = tool end
     end
-
     for _, obj in ipairs(char:GetChildren()) do
         if obj:IsA("Tool") then checkTool(obj) end
     end
@@ -546,7 +386,6 @@ autoEquipBest = function()
             if obj:IsA("Tool") then checkTool(obj) end
         end
     end
-
     if bestTool and bestTool.Parent then
         pcall(function() hum:EquipTool(bestTool) end)
     end
@@ -561,9 +400,6 @@ local function autoEquipLoop()
     end)
 end
 
--- ============================================
--- HITBOX
--- ============================================
 local originalSizes = {}
 local function expandHitbox(target, size)
     if not target or not target.Parent then return end
@@ -578,22 +414,6 @@ local function expandHitbox(target, size)
     hrp.BrickColor = BrickColor.new("Really red")
 end
 
-local function restoreHitbox(target)
-    if not target or not target.Parent then return end
-    local hrp = target:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    local orig = originalSizes[target]
-    if orig then
-        hrp.Size = orig.size
-        hrp.Transparency = orig.transparency
-        hrp.CanCollide = orig.cancollide
-        originalSizes[target] = nil
-    end
-end
-
--- ============================================
--- THROW-ABOVE AUTO KILL
--- ============================================
 local function getFixedMouseClick()
     local cam = Workspace.CurrentCamera
     if not cam then return Vector2.new(0, 0) end
@@ -610,16 +430,13 @@ local function throwAboveKill(npc)
     if not npc or not npc.model or not npc.model.Parent then return false end
     if not npc.humanoid or npc.humanoid.Health <= 0 then return true end
     local hrp = getHRP(); if not hrp then return false end
-
     local tool = equipBestTool()
     local startTime = os.clock()
     local fixedClick = getFixedMouseClick()
-
     expandHitbox(npc.model, Config.HitboxSize)
     if Config.FreezeTarget and npc.hrp then
         pcall(function() npc.hrp.Anchored = true end)
     end
-
     while Config.AutoKill do
         if not npc.model.Parent or not npc.humanoid then break end
         if npc.humanoid.Health <= 0 then
@@ -634,12 +451,10 @@ local function throwAboveKill(npc)
             end
             return false
         end
-
         pcall(function()
             hrp.CFrame = CFrame.new(npc.hrp.Position + Vector3.new(0, Config.ThrowHeight, 0))
             hrp.Velocity = Vector3.new(0, -300, 0)
         end)
-
         if tool and tool.Parent and tool:FindFirstChild("Handle") then
             pcall(function()
                 firetouchinterest(tool.Handle, npc.hrp, 0)
@@ -686,9 +501,6 @@ local function autoKillLoop()
     end)
 end
 
--- ============================================
--- KILL AURA
--- ============================================
 local function killAuraLoop()
     task.spawn(function()
         while Config.KillAura do
@@ -715,9 +527,6 @@ local function killAuraLoop()
     end)
 end
 
--- ============================================
--- AUTO FARM
--- ============================================
 local function autoFarmLoop()
     task.spawn(function()
         while Config.AutoFarm do
@@ -764,28 +573,23 @@ local function soulFarmLoop()
     end)
 end
 
--- ============================================
--- AUTO COLLECT STONES
--- ============================================
 local function autoCollectStonesLoop()
     task.spawn(function()
         while Config.AutoCollectStones do
             pcall(function()
                 local stoneTerms = {
-                    { name = "Space",   terms = {"space stone", "spacestone"} },
+                    { name = "Space", terms = {"space stone", "spacestone"} },
                     { name = "Reality", terms = {"reality stone", "realitystone"} },
-                    { name = "Time",    terms = {"time stone", "timestone"} },
-                    { name = "Mind",    terms = {"mind stone", "mindstone"} },
-                    { name = "Power",   terms = {"power stone", "powerstone"} },
-                    { name = "Soul",    terms = {"soul stone", "soulstone"} },
+                    { name = "Time", terms = {"time stone", "timestone"} },
+                    { name = "Mind", terms = {"mind stone", "mindstone"} },
+                    { name = "Power", terms = {"power stone", "powerstone"} },
+                    { name = "Soul", terms = {"soul stone", "soulstone"} },
                 }
                 for _, stone in ipairs(stoneTerms) do
                     if not Config.StonesCollected[stone.name] then
                         local obj = findObjectByTerms(stone.terms)
                         if obj then
-                            local part = obj:IsA("Model")
-                                and (obj:FindFirstChild("Handle") or obj:FindFirstChildWhichIsA("BasePart"))
-                                or obj
+                            local part = obj:IsA("Model") and (obj:FindFirstChild("Handle") or obj:FindFirstChildWhichIsA("BasePart")) or obj
                             if part and part:IsA("BasePart") then
                                 local hrp = getHRP()
                                 if hrp then
@@ -805,18 +609,37 @@ local function autoCollectStonesLoop()
     end)
 end
 
--- ============================================
--- AUTO COLLECT LUNAR
--- ============================================
+local function autoPowerStoneLoop()
+    task.spawn(function()
+        while Config.AutoPowerStone do
+            pcall(function()
+                local hrp = getHRP()
+                if hrp then
+                    local obj = findObjectByTerms({"powerstone"})
+                    if obj then
+                        local target = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChildWhichIsA("BasePart")
+                        if target then
+                            hrp.CFrame = target.CFrame * CFrame.new(0, 25, 0)
+                            hrp.Velocity = Vector3.new(0, -250, 0)
+                            task.wait(0.7)
+                            hrp.CFrame = target.CFrame * CFrame.new(0, 35, 0)
+                            task.wait(0.4)
+                        end
+                    end
+                end
+            end)
+            task.wait(1)
+        end
+    end)
+end
+
 local function autoCollectLunarLoop()
     task.spawn(function()
         while Config.AutoCollectLunar do
             pcall(function()
                 if State.LunarFragment then return end
                 local lunarNPCs = getNPCsByName("lunar")
-                if #lunarNPCs == 0 then
-                    lunarNPCs = getNPCsByName("npc 2")
-                end
+                if #lunarNPCs == 0 then lunarNPCs = getNPCsByName("npc 2") end
                 if #lunarNPCs > 0 then
                     for _, npc in ipairs(lunarNPCs) do
                         if not Config.AutoCollectLunar then break end
@@ -829,9 +652,6 @@ local function autoCollectLunarLoop()
     end)
 end
 
--- ============================================
--- AUTO COLLECT CELESTIAL
--- ============================================
 local function autoCollectCelestialLoop()
     task.spawn(function()
         while Config.AutoCollectCelestial do
@@ -886,18 +706,13 @@ local function autoCollectCelestialLoop()
     end)
 end
 
--- ============================================
--- AUTO COLLECT FROST
--- ============================================
 local function autoCollectFrostLoop()
     task.spawn(function()
         while Config.AutoCollectFrost do
             pcall(function()
                 if (State.FrostFragments or 0) >= 8 then return end
                 local presentNPCs = getNPCsByName("present 3")
-                if #presentNPCs == 0 then
-                    presentNPCs = getNPCsByName("present")
-                end
+                if #presentNPCs == 0 then presentNPCs = getNPCsByName("present") end
                 if #presentNPCs > 0 then
                     for _, npc in ipairs(presentNPCs) do
                         if not Config.AutoCollectFrost then break end
@@ -911,9 +726,6 @@ local function autoCollectFrostLoop()
     end)
 end
 
--- ============================================
--- AUTO UPGRADE GAUNTLET
--- ============================================
 local function autoUpgradeGauntletLoop()
     task.spawn(function()
         while Config.AutoUpgradeGauntlet do
@@ -951,18 +763,13 @@ local function autoKillForUpgradeLoop()
                     return
                 end
                 local target = getClosestNPC()
-                if target then
-                    throwAboveKill(target)
-                end
+                if target then throwAboveKill(target) end
             end)
             task.wait(0.1)
         end
     end)
 end
 
--- ============================================
--- TEMPLAR / FORGE / ASTRA
--- ============================================
 local function templarFarmLoop()
     task.spawn(function()
         while Config.AutoTemplarFarm do
@@ -1034,9 +841,6 @@ local function autoAstraWavesLoop()
     end)
 end
 
--- ============================================
--- NEW HACKS
--- ============================================
 local function godModeLoop()
     task.spawn(function()
         while Config.GodMode do
@@ -1117,9 +921,6 @@ local function autoParryLoop()
     end)
 end
 
--- ============================================
--- MISC LOOPS
--- ============================================
 local function espLoop()
     task.spawn(function()
         while Config.ESP do
@@ -1226,9 +1027,6 @@ local function noClipLoop()
     end)
 end
 
--- ============================================
--- NOTIFICATION SYSTEM
--- ============================================
 local NotificationFrame = nil
 
 local function initNotifications(screenGui)
@@ -1303,7 +1101,7 @@ notify = function(title, text, color, duration)
 end
 
 -- ============================================
--- UI BUILD — WIDE + FULL DRAG
+-- UI BUILD
 -- ============================================
 local function createUI()
     pcall(function()
@@ -1316,9 +1114,7 @@ local function createUI()
     end)
 
     local guiParent = PlayerGui
-    pcall(function()
-        if gethui then guiParent = gethui() end
-    end)
+    pcall(function() if gethui then guiParent = gethui() end end)
 
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "P_ThanosSim"
@@ -1343,11 +1139,11 @@ local function createUI()
     obStroke.Color = Theme.Purple
     obStroke.Thickness = 2
 
-    -- MAIN FRAME — WIDE
+    -- MAIN — pure offset positioning for clean drag
     local Main = Instance.new("Frame")
     Main.Name = "Main"
     Main.Size = UDim2.new(0, 560, 0, 360)
-    Main.Position = Config.UIPosition
+    Main.Position = UDim2.new(0.5, -280, 0.5, -180)
     Main.BackgroundColor3 = Theme.Bg
     Main.BorderSizePixel = 0
     Main.Active = true
@@ -1367,11 +1163,6 @@ local function createUI()
     local UIScale = Instance.new("UIScale")
     UIScale.Scale = 1
     UIScale.Parent = Main
-
-    local sizeConstraint = Instance.new("UISizeConstraint")
-    sizeConstraint.MinSize = Vector2.new(320, 200)
-    sizeConstraint.MaxSize = Vector2.new(900, 700)
-    sizeConstraint.Parent = Main
 
     -- TITLE BAR
     local TitleBar = Instance.new("Frame")
@@ -1410,11 +1201,12 @@ local function createUI()
 
     local LogoCut = Instance.new("Frame")
     LogoCut.Size = UDim2.new(0.7, 0, 0.85, 0)
-    LogoCut.Position = UDim2.new(0.35, 0, 0.05, 0)
+    LogoCutImage.Position = UDim2.newLabel(0.35, ")
+   0, 0.05, 0)
     LogoCut.BackgroundColor3 = Theme.Panel
-    LogoCut.BorderSizePixel = 0
+    LogoCut.B AvatarorderSizePixel = 0
     LogoCut.Parent = LogoHolder
-    Instance.new("UICorner", LogoCut).CornerRadius = UDim.new(1, 0)
+    Instance.Size.new("UICorner", LogoCut).CornerRadius = UDim.new(1, 0)
 
     local TitleLbl = Instance.new("TextLabel")
     TitleLbl.Size = UDim2.new(1, -200, 0, 18)
@@ -1431,7 +1223,7 @@ local function createUI()
     SubLbl.Size = UDim2.new(1, -200, 0, 12)
     SubLbl.Position = UDim2.new(0, 50, 0, 27)
     SubLbl.BackgroundTransparency = 1
-    SubLbl.Text = "P edition · v4.1 · wide"
+    SubLbl.Text = "P edition · v4.2 · scroll"
     SubLbl.TextColor3 = Theme.Gold
     SubLbl.Font = Enum.Font.Gotham
     SubLbl.TextSize = 10
@@ -1470,8 +1262,7 @@ local function createUI()
     gGrad.Color = ColorSequence.new(Theme.Card, Theme.Panel)
     gGrad.Rotation = 90
 
-    local Avatar = Instance.new("ImageLabel")
-    Avatar.Size = UDim2.new(0, 26, 0, 26)
+    local Avatar = Instance.new(" = UDim2.new(0, 26, 0, 26)
     Avatar.Position = UDim2.new(0, 8, 0.5, -13)
     Avatar.BackgroundColor3 = Theme.CardSub
     Avatar.BorderSizePixel = 0
@@ -1529,7 +1320,7 @@ local function createUI()
     tabLayout.Padding = UDim.new(0, 5)
     tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-    -- CONTENT
+    -- CONTENT — scrollable
     local Content = Instance.new("ScrollingFrame")
     Content.Name = "Content"
     Content.Size = UDim2.new(1, -16, 1, -160)
@@ -1539,8 +1330,12 @@ local function createUI()
     Content.CanvasSize = UDim2.new(0, 0, 0, 0)
     Content.ScrollBarThickness = 4
     Content.ScrollBarImageColor3 = Theme.Purple
+    Content.ScrollBarImageTransparency = 0.3
+    Content.ScrollingDirection = Enum.ScrollingDirection.Y
     Content.Parent = Main
     Instance.new("UICorner", Content).CornerRadius = UDim.new(0, 10)
+    local cStroke = Instance.new("UIStroke", Content)
+    cStroke.Color = Theme.BorderDim
 
     local contentPad = Instance.new("UIPadding", Content)
     contentPad.PaddingTop = UDim.new(0, 8)
@@ -1592,7 +1387,6 @@ local function createUI()
     CloseBtn.MouseButton1Click:Connect(function()
         TweenService:Create(Main, TweenInfo.new(0.15, Enum.EasingStyle.Back), {
             Size = UDim2.new(0, 0, 0, 0),
-            Position = UDim2.new(0.5, 0, 0.5, 0),
         }):Play()
         task.wait(0.15)
         ScreenGui.Enabled = false
@@ -1602,10 +1396,8 @@ local function createUI()
         OpenBtn.Visible = false
         ScreenGui.Enabled = true
         Main.Size = UDim2.new(0, 0, 0, 0)
-        Main.Position = UDim2.new(0.5, 0, 0.5, 0)
         TweenService:Create(Main, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
             Size = UDim2.new(0, 560, 0, 360),
-            Position = Config.UIPosition,
         }):Play()
     end)
     ResizeMinus.MouseButton1Click:Connect(function()
@@ -1618,19 +1410,21 @@ local function createUI()
     end)
 
     -- ============================================
-    -- DRAG — FULL SCREEN (FIXED)
+    -- DRAG — FIXED (full screen, works on all sides)
     -- ============================================
     local dragging = false
     local dragStart, startPos
 
-    -- Full-free clamp: only 25px must stay on screen so it can always be grabbed back
-    local function clampPos(pos, obj)
-        local vp = Workspace.CurrentCamera.ViewportSize
+    -- The fix: clamp the ACTUAL screen position, not the raw Offset.
+    -- Also uses scale 0 for returned UDim2 so offsets are absolute.
+    local function clampPos(newX, newY, obj)
+        local cam = Workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
         local size = obj.AbsoluteSize
         local margin = 25
-        local x = math.clamp(pos.X.Offset, -size.X + margin, vp.X - margin)
-        local y = math.clamp(pos.Y.Offset, -size.Y + margin, vp.Y - margin)
-        return UDim2.new(pos.X.Scale, x, pos.Y.Scale, y)
+        local clampedX = math.clamp(newX, -size.X + margin, vp.X - margin)
+        local clampedY = math.clamp(newY, -size.Y + margin, vp.Y - margin)
+        return UDim2.new(0, clampedX, 0, clampedY)
     end
 
     local function beginDrag(input)
@@ -1638,7 +1432,13 @@ local function createUI()
            or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
-            startPos = Main.Position
+            -- Convert current position to absolute screen offset
+            local cam = Workspace.CurrentCamera
+            local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
+            startPos = {
+                x = Main.Position.X.Scale * vp.X + Main.Position.X.Offset,
+                y = Main.Position.Y.Scale * vp.Y + Main.Position.Y.Offset,
+            }
         end
     end
 
@@ -1647,10 +1447,7 @@ local function createUI()
         if input.UserInputType ~= Enum.UserInputType.MouseMovement
            and input.UserInputType ~= Enum.UserInputType.Touch then return end
         local delta = input.Position - dragStart
-        Main.Position = clampPos(UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X,
-            startPos.Y.Scale, startPos.Y.Offset + delta.Y
-        ), Main)
+        Main.Position = clampPos(startPos.x + delta.X, startPos.y + delta.Y, Main)
     end
 
     local function endDrag(input)
@@ -1666,9 +1463,9 @@ local function createUI()
     UserInputService.InputChanged:Connect(moveDrag)
     UserInputService.InputEnded:Connect(endDrag)
 
-    -- Prevent title bar children from eating drag touches
+    -- Let title bar children pass through to drag
     for _, child in ipairs(TitleBar:GetChildren()) do
-        if child:IsA("TextLabel") or child:IsA("Frame") then
+        if child:IsA("TextLabel") then
             child.Active = false
         end
     end
@@ -1686,6 +1483,16 @@ local function createUI()
                 }):Play()
                 tab.Button.TextColor3 = Theme.Gold
                 tab.Indicator.Visible = true
+                -- Reset scroll to top
+                Content.CanvasPosition = Vector2.new(0, 0)
+                -- Update canvas size to fit this tab's content
+                task.defer(function()
+                    local layoutSize = tab.Content:FindFirstChildOfClass("UIListLayout")
+                    if layoutSize then
+                        local cSize = layoutSize.AbsoluteContentSize.Y
+                        Content.CanvasSize = UDim2.new(0, 0, 0, cSize + 20)
+                    end
+                end)
             else
                 tab.Content.Visible = false
                 TweenService:Create(tab.Button, TweenInfo.new(0.12), {
@@ -1727,7 +1534,7 @@ local function createUI()
 
         local content = Instance.new("Frame")
         content.Name = name .. "Content"
-        content.Size = UDim2.new(1, 0, 1, 0)
+        content.Size = UDim2.new(1, 0, 0, 0)
         content.BackgroundTransparency = 1
         content.Visible = false
         content.Parent = Content
@@ -1735,6 +1542,14 @@ local function createUI()
         local layout = Instance.new("UIListLayout", content)
         layout.Padding = UDim.new(0, 6)
         layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+        -- Auto-resize content height to fit children
+        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            content.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y)
+            if content.Visible then
+                Content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+            end
+        end)
 
         btn.MouseButton1Click:Connect(function() switchTab(name) end)
         Tabs[name] = { Button = btn, Content = content, Indicator = indicator }
@@ -1969,11 +1784,8 @@ local function createUI()
         return l
     end
 
-    -- ==========================================
     -- TAB: HOME
-    -- ==========================================
     local HomeTab = createTab("Home", "⌂", 1)
-
     makeSection(HomeTab, "Live Stats", 1)
     local statsCard = makeCard(HomeTab, 68, 2)
 
@@ -2052,11 +1864,8 @@ local function createUI()
         Config.DPSWindow = {}
     end, Theme.Card, 7)
 
-    -- ==========================================
     -- TAB: COMBAT
-    -- ==========================================
     local CombatTab = createTab("Combat", "⚔", 2)
-
     makeSection(CombatTab, "Throw-Above Auto Kill", 1)
     local akCard = makeCard(CombatTab, 100, 2)
     local akTitle = Instance.new("TextLabel", akCard)
@@ -2143,11 +1952,8 @@ local function createUI()
         if v then soulFarmLoop() end
     end, 2)
 
-    -- ==========================================
     -- TAB: GEAR
-    -- ==========================================
     local GearTab = createTab("Gear", "⚜", 3)
-
     makeSection(GearTab, "Weapon Getters", 1)
     makeLabel(GearTab, "Checks requirements · auto-collects if missing", Theme.TextMuted, 2)
 
@@ -2232,11 +2038,8 @@ local function createUI()
         end, s[2], 24 + i)
     end
 
-    -- ==========================================
     -- TAB: AUTO
-    -- ==========================================
     local AutoTab = createTab("Auto", "⚙", 4)
-
     makeSection(AutoTab, "Auto Upgrade Gauntlet", 1)
     makeToggle(AutoTab, "Auto Kill for Upgrade (200k)", false, function(v)
         Config.AutoKillForUpgrade = v
@@ -2277,13 +2080,10 @@ local function createUI()
         if v then autoPowerStoneLoop() end
     end, 12)
 
-    -- ==========================================
     -- TAB: MISC
-    -- ==========================================
     local MiscTab = createTab("Misc", "✦", 5)
-
     makeSection(MiscTab, "Character", 1)
-    local charCard = makeCard(MiscTab, 160, 2)
+    local charCard = makeCard(MiscTab, 200, 2)
     local chHolder = Instance.new("Frame", charCard)
     chHolder.Size = UDim2.new(1, -20, 1, -16)
     chHolder.Position = UDim2.new(0, 10, 0, 8)
@@ -2309,7 +2109,7 @@ local function createUI()
     makeToggle(chHolder, "No Clip", false, function(v) Config.NoClip = v end, 6)
 
     makeSection(MiscTab, "Movement", 3)
-    local mvCard = makeCard(MiscTab, 130, 4)
+    local mvCard = makeCard(MiscTab, 140, 4)
     local mvHolder = Instance.new("Frame", mvCard)
     mvHolder.Size = UDim2.new(1, -20, 1, -16)
     mvHolder.Position = UDim2.new(0, 10, 0, 8)
@@ -2327,7 +2127,7 @@ local function createUI()
     makeSlider(mvHolder, "Fly Speed", 10, 200, 60, function(v) Config.FlySpeed = v end, 3)
 
     makeSection(MiscTab, "Safety", 5)
-    local safetyCard = makeCard(MiscTab, 90, 6)
+    local safetyCard = makeCard(MiscTab, 100, 6)
     local sHolder = Instance.new("Frame", safetyCard)
     sHolder.Size = UDim2.new(1, -20, 1, -16)
     sHolder.Position = UDim2.new(0, 10, 0, 8)
@@ -2346,7 +2146,7 @@ local function createUI()
     end, 2)
 
     makeSection(MiscTab, "Visuals", 7)
-    local visCard = makeCard(MiscTab, 90, 8)
+    local visCard = makeCard(MiscTab, 100, 8)
     local vHolder = Instance.new("Frame", visCard)
     vHolder.Size = UDim2.new(1, -20, 1, -16)
     vHolder.Position = UDim2.new(0, 10, 0, 8)
@@ -2479,21 +2279,17 @@ end)
 
 task.wait(0.3)
 pcall(function()
-    notify("P | Thanos Simulator", "Wide UI v4.1 loaded", Theme.Purple, 4)
+    notify("P | Thanos Simulator", "v4.2 loaded — scrollable UI", Theme.Purple, 4)
 end)
 task.wait(0.2)
 pcall(function()
-    notify("Full Drag Ready", "Move UI anywhere on screen", Theme.Emerald, 4)
-end)
-task.wait(0.2)
-pcall(function()
-    notify("Auto-Collect Ready", "Lunar · Celestial · Frost", Theme.Gold, 4)
+    notify("Full Drag Ready", "Drag title bar anywhere", Theme.Emerald, 4)
 end)
 
 pcall(function()
     StarterGui:SetCore("SendNotification", {
         Title = "P | Thanos Simulator",
-        Text = "Wide UI loaded. Drag title bar anywhere.",
+        Text = "Loaded. Drag title bar · scroll content for more options.",
         Duration = 6,
     })
 end)

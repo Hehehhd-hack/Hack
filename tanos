@@ -1,6 +1,6 @@
 -- ============================================
 -- Infinity Gauntlet | Thanos Simulator
--- "P" Edition v6.0 — Starfield UI + Auto-Farm
+-- "P" Edition v6.1 — Float Stars + Fixed Tabs
 -- ============================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -71,12 +71,8 @@ end
 
 local ok, err = pcall(function()
 
--- ============================================
--- THEME
--- ============================================
 local Theme = {
     Bg = Color3.fromRGB(8, 6, 16),
-    BgDeep = Color3.fromRGB(4, 3, 10),
     Panel = Color3.fromRGB(18, 14, 30),
     PanelLight = Color3.fromRGB(26, 20, 42),
     Card = Color3.fromRGB(32, 24, 50),
@@ -89,10 +85,8 @@ local Theme = {
     PurpleBright = Color3.fromRGB(195, 140, 255),
     Gold = Color3.fromRGB(255, 210, 80),
     GoldBright = Color3.fromRGB(255, 235, 140),
-    GoldDeep = Color3.fromRGB(190, 135, 35),
     Crimson = Color3.fromRGB(230, 60, 90),
     Emerald = Color3.fromRGB(70, 220, 140),
-    EmeraldDeep = Color3.fromRGB(30, 130, 85),
     Cyan = Color3.fromRGB(110, 210, 250),
     Orange = Color3.fromRGB(255, 145, 60),
     Pink = Color3.fromRGB(255, 100, 190),
@@ -108,9 +102,6 @@ local Theme = {
     StoneSoul = Color3.fromRGB(255, 130, 40),
 }
 
--- ============================================
--- CONFIG
--- ============================================
 local Config = {
     AutoKill = false, ThrowHeight = 50, KillDelay = 0.05,
     KillLockTimeout = 3, HitboxSize = 15, HitboxTransparency = 0.7,
@@ -139,9 +130,6 @@ if not getgenv().ThanosSim then
 end
 local State = getgenv().ThanosSim
 
--- ============================================
--- WEAPON DB
--- ============================================
 local WeaponDB = {
     { name = "Infinity Gauntlet", requirements = { kills = 0, fragments = 0, stones = {"Space Stone"}, items = {} }, color = Theme.StoneSpace, priority = 5 },
     { name = "Upgraded Infinity Gauntlet", requirements = { kills = 200000, fragments = 0, stones = {}, items = {"Infinity Gauntlet"} }, color = Theme.Purple, priority = 10 },
@@ -154,17 +142,11 @@ local WeaponDB = {
     { name = "Mechanical Gloves", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Infinity Gauntlet"} }, color = Theme.Blue, priority = 2 },
 }
 
--- ============================================
--- FORWARD DECLARATIONS
--- ============================================
 local getCharacter, getHRP, getHumanoid, isValidNPC, getAllNPCs
 local getClosestNPC, equipBestTool, fireTouch, findObjectByTerms
 local fmt, formatTime, getOwnedItems, checkRequirements
 local autoEquipBest, getNPCsByName, findItem
 
--- ============================================
--- UTILITIES
--- ============================================
 getCharacter = function()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
@@ -323,9 +305,6 @@ getOwnedItems = function()
     return items
 end
 
--- ============================================
--- REQUIREMENTS
--- ============================================
 checkRequirements = function(weaponName)
     local weapon
     for _, w in ipairs(WeaponDB) do
@@ -362,9 +341,6 @@ checkRequirements = function(weaponName)
     return #missing == 0, missing, missingItems, weapon
 end
 
--- ============================================
--- AUTO EQUIP BEST
--- ============================================
 autoEquipBest = function()
     if not Config.AutoEquipBest then return end
     local char = getCharacter()
@@ -397,9 +373,6 @@ autoEquipBest = function()
     end
 end
 
--- ============================================
--- HITBOX
--- ============================================
 local originalSizes = {}
 
 local function expandHitbox(target, size)
@@ -428,9 +401,6 @@ local function restoreAllHitboxes()
     originalSizes = {}
 end
 
--- ============================================
--- AUTO KILL (HoHo style)
--- ============================================
 local function getFixedClick()
     local cam = Workspace.CurrentCamera
     if not cam then return Vector2.new(0, 0) end
@@ -563,9 +533,6 @@ local function autoFarmLoop()
     end)
 end
 
--- ============================================
--- AUTO-COLLECT LOOPS
--- ============================================
 local function autoCollectStonesLoop()
     task.spawn(function()
         while Config.AutoCollectStones do
@@ -759,9 +726,6 @@ local function autoAstraWavesLoop()
     end)
 end
 
--- ============================================
--- AUTO-FARM FOR REQUIREMENTS (the fix)
--- ============================================
 local function startRequirementFarm(weaponName)
     local canGet, missing, missingItems, weapon = checkRequirements(weaponName)
     if canGet then return true end
@@ -769,7 +733,6 @@ local function startRequirementFarm(weaponName)
 
     local started = {}
 
-    -- Kills shortfall -> start auto-kill
     if weapon.requirements.kills > 0 and (State.KillCount or 0) < weapon.requirements.kills then
         if not Config.AutoKill then
             Config.AutoKill = true
@@ -778,7 +741,6 @@ local function startRequirementFarm(weaponName)
         end
     end
 
-    -- Fragments shortfall -> start templar farm
     if weapon.requirements.fragments > 0 and (State.FragmentCount or 0) < weapon.requirements.fragments then
         if not Config.AutoTemplarFarm then
             Config.AutoTemplarFarm = true
@@ -787,7 +749,6 @@ local function startRequirementFarm(weaponName)
         end
     end
 
-    -- Stones -> start stone collect
     for _, stone in ipairs(weapon.requirements.stones or {}) do
         local key = stone:gsub(" Stone", "")
         if not Config.StonesCollected[key] and not State.StonesCollected[key] then
@@ -800,7 +761,6 @@ local function startRequirementFarm(weaponName)
         end
     end
 
-    -- Missing items -> start specific collector
     for _, item in ipairs(missingItems) do
         if item:lower():find("lunar") then
             if not Config.AutoCollectLunar then
@@ -835,7 +795,6 @@ local function startRequirementFarm(weaponName)
     return false, {}
 end
 
--- Background loop: check if requirements are now met
 local function reqFarmWatcher()
     task.spawn(function()
         while true do
@@ -845,7 +804,6 @@ local function reqFarmWatcher()
                     Config.ReqFarmActive = false
                     local name = Config.ReqFarmTarget
                     Config.ReqFarmTarget = nil
-                    -- stop auto loops
                     Config.AutoKill = false
                     Config.AutoTemplarFarm = false
                     Config.AutoCollectStones = false
@@ -853,7 +811,7 @@ local function reqFarmWatcher()
                     Config.AutoCollectCelestial = false
                     Config.AutoCollectFrost = false
                     if _G.P_Notify then
-                        _G.P_Notify("Requirements Met", name .. " ready to collect!", Color3.fromRGB(70, 220, 140), 5)
+                        _G.P_Notify("Requirements Met", name .. " ready!", Color3.fromRGB(70, 220, 140), 5)
                     end
                 end
             end
@@ -862,9 +820,6 @@ local function reqFarmWatcher()
     end)
 end
 
--- ============================================
--- OTHER LOOPS
--- ============================================
 local function godModeLoop()
     task.spawn(function()
         while Config.GodMode do
@@ -1025,9 +980,6 @@ local function infiniteJumpHandler()
     end)
 end
 
--- ============================================
--- NOTIFICATIONS
--- ============================================
 local NotificationFrame = nil
 
 local function initNotifications(sg)
@@ -1099,9 +1051,6 @@ end
 
 _G.P_Notify = notify
 
--- ============================================
--- UI
--- ============================================
 local ScreenGui, Main, Content, TabBar, UIScale, OpenBtn, StatusDot, StatsBar, FooterLbl
 
 local function buildUI()
@@ -1116,7 +1065,6 @@ local function buildUI()
     ScreenGui.DisplayOrder = 999
     ScreenGui.Parent = PlayerGui
 
-    -- Open button
     OpenBtn = Instance.new("TextButton")
     OpenBtn.Size = UDim2.new(0, 44, 0, 44)
     OpenBtn.Position = UDim2.new(0, 12, 0.5, -22)
@@ -1132,7 +1080,6 @@ local function buildUI()
     obs.Color = Theme.Purple
     obs.Thickness = 2
 
-    -- Main
     Main = Instance.new("Frame")
     Main.Name = "Main"
     Main.Size = UDim2.new(0, 580, 0, 380)
@@ -1160,7 +1107,7 @@ local function buildUI()
     UIScale.Parent = Main
 
     -- ============================================
-    -- STARFIELD BACKGROUND
+    -- FLOATING STARS (drift + twinkle)
     -- ============================================
     local Starfield = Instance.new("Frame")
     Starfield.Name = "Starfield"
@@ -1170,20 +1117,36 @@ local function buildUI()
     Starfield.ZIndex = 0
     Starfield.Parent = Main
 
-    -- Generate stars
     task.spawn(function()
-        for i = 1, 60 do
+        for i = 1, 40 do
             if not Starfield.Parent then break end
             local star = Instance.new("Frame")
-            local sz = math.random(1, 3)
+            local sz = math.random(2, 4)
             star.Size = UDim2.new(0, sz, 0, sz)
             star.Position = UDim2.new(math.random(), 0, math.random(), 0)
-            star.BackgroundColor3 = i % 5 == 0 and Theme.Gold or Color3.fromRGB(255, 255, 255)
+            star.BackgroundColor3 = (i % 4 == 0) and Theme.Gold or Color3.fromRGB(255, 255, 255)
             star.BorderSizePixel = 0
             star.ZIndex = 0
-            star.BackgroundTransparency = 0.3 + math.random() * 0.5
+            star.BackgroundTransparency = 0.3 + math.random() * 0.4
             star.Parent = Starfield
             Instance.new("UICorner", star).CornerRadius = UDim.new(1, 0)
+
+            -- Floating drift across the whole UI
+            task.spawn(function()
+                while star.Parent do
+                    local startX = star.Position.X.Scale
+                    local startY = star.Position.Y.Scale
+                    local newX = math.clamp(startX + (math.random() - 0.5) * 0.8, 0, 1)
+                    local newY = math.clamp(startY + (math.random() - 0.5) * 0.8, 0, 1)
+                    local dur = 6 + math.random() * 12
+                    pcall(function()
+                        TweenService:Create(star, TweenInfo.new(dur, Enum.EasingStyle.Linear), {
+                            Position = UDim2.new(newX, 0, newY, 0)
+                        }):Play()
+                    end)
+                    task.wait(dur)
+                end
+            end)
 
             -- Twinkle
             task.spawn(function()
@@ -1201,7 +1164,7 @@ local function buildUI()
         end
     end)
 
-    -- Title bar with starfield behind
+    -- Title bar
     local TitleBar = Instance.new("Frame")
     TitleBar.Name = "TitleBar"
     TitleBar.Size = UDim2.new(1, 0, 0, 52)
@@ -1221,7 +1184,6 @@ local function buildUI()
     tGrad.Color = ColorSequence.new(Theme.PurpleDeep, Theme.Panel)
     tGrad.Rotation = 0
 
-    -- Logo with glow
     local LogoGlow = Instance.new("Frame")
     LogoGlow.Size = UDim2.new(0, 40, 0, 40)
     LogoGlow.Position = UDim2.new(0, 12, 0.5, -20)
@@ -1264,7 +1226,6 @@ local function buildUI()
     TitleLbl.Active = false
     TitleLbl.Parent = TitleBar
 
-    -- Animated glow on title
     task.spawn(function()
         local t = 0
         while TitleLbl.Parent do
@@ -1285,7 +1246,7 @@ local function buildUI()
     SubLbl.Size = UDim2.new(1, -220, 0, 12)
     SubLbl.Position = UDim2.new(0, 56, 0, 30)
     SubLbl.BackgroundTransparency = 1
-    SubLbl.Text = "P edition · v6.0"
+    SubLbl.Text = "P edition · v6.1"
     SubLbl.TextColor3 = Theme.Gold
     SubLbl.Font = Enum.Font.Gotham
     SubLbl.TextSize = 10
@@ -1315,7 +1276,6 @@ local function buildUI()
     local ResizePlus = headerBtn("+", -130, Theme.Card)
     local CloseBtn = headerBtn("×", -34, Theme.Crimson)
 
-    -- Greeting
     local Greeting = Instance.new("Frame")
     Greeting.Size = UDim2.new(1, -16, 0, 40)
     Greeting.Position = UDim2.new(0, 8, 0, 58)
@@ -1366,7 +1326,9 @@ local function buildUI()
     StatsBar.ZIndex = 3
     StatsBar.Parent = Greeting
 
-    -- Tab bar
+    -- ============================================
+    -- TAB BAR
+    -- ============================================
     TabBar = Instance.new("ScrollingFrame")
     TabBar.Name = "TabBar"
     TabBar.Size = UDim2.new(1, -16, 0, 36)
@@ -1375,6 +1337,7 @@ local function buildUI()
     TabBar.BorderSizePixel = 0
     TabBar.ScrollBarThickness = 0
     TabBar.CanvasSize = UDim2.new(0, 0, 0, 0)
+    TabBar.AutomaticCanvasSize = Enum.AutomaticSize.X
     TabBar.ScrollingDirection = Enum.ScrollingDirection.X
     TabBar.ZIndex = 2
     TabBar.Parent = Main
@@ -1383,7 +1346,9 @@ local function buildUI()
     tl.Padding = UDim.new(0, 6)
     tl.SortOrder = Enum.SortOrder.LayoutOrder
 
-    -- Content
+    -- ============================================
+    -- CONTENT (uses AutomaticCanvasSize)
+    -- ============================================
     Content = Instance.new("ScrollingFrame")
     Content.Name = "Content"
     Content.Size = UDim2.new(1, -16, 1, -168)
@@ -1392,6 +1357,7 @@ local function buildUI()
     Content.BackgroundTransparency = 0.15
     Content.BorderSizePixel = 0
     Content.CanvasSize = UDim2.new(0, 0, 0, 0)
+    Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
     Content.ScrollBarThickness = 4
     Content.ScrollBarImageColor3 = Theme.Purple
     Content.ScrollBarImageTransparency = 0.3
@@ -1407,7 +1373,6 @@ local function buildUI()
     cp.PaddingLeft = UDim.new(0, 8)
     cp.PaddingRight = UDim.new(0, 8)
 
-    -- Footer
     local Footer = Instance.new("Frame")
     Footer.Size = UDim2.new(1, -16, 0, 26)
     Footer.Position = UDim2.new(0, 8, 1, -30)
@@ -1437,7 +1402,6 @@ local function buildUI()
     StatusDot.ZIndex = 3
     Instance.new("UICorner", StatusDot).CornerRadius = UDim.new(1, 0)
 
-    -- Collapse
     local function setCollapsed(state)
         Config.Collapsed = state
         TabBar.Visible = not state
@@ -1475,7 +1439,6 @@ local function buildUI()
         TweenService:Create(UIScale, TweenInfo.new(0.12), {Scale = Config.UIScaleValue}):Play()
     end)
 
-    -- DRAG
     local dragging, dragStart, startAbsX, startAbsY = false, nil, 0, 0
 
     local function beginDrag(input)
@@ -1519,8 +1482,11 @@ local function buildUI()
     UIS.InputChanged:Connect(moveDrag)
     UIS.InputEnded:Connect(endDrag)
 
-    -- Tabs
+    -- ============================================
+    -- TAB SYSTEM (fixed: pages use AutomaticSize)
+    -- ============================================
     local Tabs = {}
+
     local function switchTab(name)
         for tn, tab in pairs(Tabs) do
             if tn == name then
@@ -1529,12 +1495,6 @@ local function buildUI()
                 tab.Btn.TextColor3 = Theme.Gold
                 tab.Ind.Visible = true
                 Content.CanvasPosition = Vector2.new(0, 0)
-                task.defer(function()
-                    local l = tab.Frame:FindFirstChildOfClass("UIListLayout")
-                    if l then
-                        Content.CanvasSize = UDim2.new(0, 0, 0, l.AbsoluteContentSize.Y + 20)
-                    end
-                end)
             else
                 tab.Frame.Visible = false
                 TweenService:Create(tab.Btn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.Card}):Play()
@@ -1567,33 +1527,27 @@ local function buildUI()
         ind.Visible = false
         ind.ZIndex = 4
         Instance.new("UICorner", ind).CornerRadius = UDim.new(1, 0)
-        local ig = Instance.new("UIGradient", ind)
-        ig.Color = ColorSequence.new(Theme.GoldBright, Theme.Gold)
 
+        -- Page: FIXED - uses AutomaticSize.Y so it grows with children
         local page = Instance.new("Frame")
+        page.Name = name .. "Page"
         page.Size = UDim2.new(1, 0, 0, 0)
+        page.AutomaticSize = Enum.AutomaticSize.Y
         page.BackgroundTransparency = 1
         page.Visible = false
         page.ZIndex = 3
         page.Parent = Content
+
         local layout = Instance.new("UIListLayout", page)
         layout.Padding = UDim.new(0, 7)
         layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            page.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y)
-            if page.Visible then
-                Content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
-            end
-        end)
+        layout.FillDirection = Enum.FillDirection.Vertical
 
         btn.MouseButton1Click:Connect(function() switchTab(name) end)
         Tabs[name] = {Btn = btn, Frame = page, Ind = ind}
         return page
     end
 
-    -- ============================================
-    -- CLICK-ONLY TOGGLE (fix for scroll)
-    -- ============================================
     local function isClickInput(input)
         return input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch
@@ -1606,6 +1560,7 @@ local function buildUI()
         h.BorderSizePixel = 0
         h.LayoutOrder = order or 0
         h.ZIndex = 3
+        h.Active = true
         h.Parent = parent
         Instance.new("UICorner", h).CornerRadius = UDim.new(0, 9)
         local hStroke = Instance.new("UIStroke", h)
@@ -1653,17 +1608,11 @@ local function buildUI()
             if callback then pcall(callback, state) end
         end
 
-        -- Critical: only respond to actual clicks
         h.InputBegan:Connect(function(input)
             if isClickInput(input) then
                 apply(not state)
             end
         end)
-
-        return {
-            Set = function(v) apply(v) end,
-            Frame = h,
-        }
     end
 
     local function button(parent, name, callback, accent, order)
@@ -1808,7 +1757,6 @@ local function buildUI()
         f.ZIndex = 3
         f.Parent = parent
 
-        -- Left star accent
         local star = Instance.new("Frame", f)
         star.Size = UDim2.new(0, 4, 0, 4)
         star.Position = UDim2.new(0, 4, 0.5, -2)
@@ -1829,9 +1777,6 @@ local function buildUI()
         l.ZIndex = 4
     end
 
-    -- ============================================
-    -- PROGRESS BAR for requirements
-    -- ============================================
     local function progressBar(parent, label, getCurrent, getMax, order)
         local h = Instance.new("Frame")
         h.Size = UDim2.new(1, 0, 0, 26)
@@ -1858,7 +1803,7 @@ local function buildUI()
         valLbl.Position = UDim2.new(0.5, 0, 0, 0)
         valLbl.BackgroundTransparency = 1
         valLbl.Text = "0/0"
-        valLbl.TextColor3 = Theme.TextGold
+        valLbl.TextColor3 = Theme.Gold
         valLbl.Font = Enum.Font.GothamBold
         valLbl.TextSize = 10
         valLbl.TextXAlignment = Enum.TextXAlignment.Right
@@ -1874,7 +1819,7 @@ local function buildUI()
 
         local fill = Instance.new("Frame", track)
         fill.Size = UDim2.new(0, 0, 1, 0)
-        fill.BackgroundColor3 = Theme.Emerald
+        fill.BackgroundColor3 = Theme.Purple
         fill.BorderSizePixel = 0
         fill.ZIndex = 5
         Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
@@ -1887,11 +1832,7 @@ local function buildUI()
                     local pct = mx > 0 and math.min(cur / mx, 1) or 0
                     fill.Size = UDim2.new(pct, 0, 1, 0)
                     valLbl.Text = string.format("%s/%s", fmt(cur), fmt(mx))
-                    if pct >= 1 then
-                        fill.BackgroundColor3 = Theme.Emerald
-                    else
-                        fill.BackgroundColor3 = Theme.Purple
-                    end
+                    fill.BackgroundColor3 = pct >= 1 and Theme.Emerald or Theme.Purple
                 end)
                 task.wait(0.5)
             end
@@ -1999,23 +1940,23 @@ local function buildUI()
     slider(combat, "Farm Speed", 1, 50, 10, function(v) Config.FarmSpeed = v / 100 end, 13)
 
     -- ============================================
-    -- GEAR TAB (with progress + auto-farm)
+    -- GEAR TAB
     -- ============================================
     local gear = makeTab("Gear", "⚜", 3)
     section(gear, "Weapons", 1)
 
     for i, w in ipairs(WeaponDB) do
-        -- Each weapon gets its own mini card with progress
         local card = Instance.new("Frame", gear)
-        card.Size = UDim2.new(1, 0, 0, 60)
+        card.Size = UDim2.new(1, 0, 0, 62)
         card.BackgroundColor3 = Theme.Card
         card.BorderSizePixel = 0
         card.LayoutOrder = 2 + (i * 2)
         card.ZIndex = 3
         card.Parent = gear
         Instance.new("UICorner", card).CornerRadius = UDim.new(0, 9)
-        Instance.new("UIStroke", card).Color = w.color
-        card.UIStroke.Transparency = 0.6
+        local cStroke = Instance.new("UIStroke", card)
+        cStroke.Color = w.color
+        cStroke.Transparency = 0.6
 
         local nameLbl = Instance.new("TextLabel", card)
         nameLbl.Size = UDim2.new(1, -100, 0, 16)
@@ -2029,7 +1970,7 @@ local function buildUI()
         nameLbl.ZIndex = 4
 
         local statusLbl = Instance.new("TextLabel", card)
-        statusLbl.Size = UDim2.new(1, -100, 0, 12)
+        statusLbl.Size = UDim2.new(1, -100, 0, 24)
         statusLbl.Position = UDim2.new(0, 10, 0, 22)
         statusLbl.BackgroundTransparency = 1
         statusLbl.Text = "checking..."
@@ -2037,6 +1978,7 @@ local function buildUI()
         statusLbl.Font = Enum.Font.Gotham
         statusLbl.TextSize = 9
         statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+        statusLbl.TextWrapped = true
         statusLbl.ZIndex = 4
 
         task.spawn(function()
@@ -2066,9 +2008,6 @@ local function buildUI()
         collectBtn.AutoButtonColor = false
         collectBtn.ZIndex = 4
         Instance.new("UICorner", collectBtn).CornerRadius = UDim.new(0, 7)
-        local cg = Instance.new("UIGradient", collectBtn)
-        cg.Color = ColorSequence.new(w.color, w.color:Lerp(Color3.new(0,0,0), 0.3))
-        cg.Rotation = 90
 
         collectBtn.MouseEnter:Connect(function()
             TweenService:Create(collectBtn, TweenInfo.new(0.12), {BackgroundColor3 = w.color:Lerp(Color3.new(1,1,1), 0.2)}):Play()
@@ -2103,7 +2042,6 @@ local function buildUI()
                         end
                     end
                 else
-                    -- START FARMING
                     local started = startRequirementFarm(w.name)
                     if started and #started > 0 then
                         notify("Auto-Farming Started", table.concat(started, " · "), Theme.Gold, 5)
@@ -2207,7 +2145,6 @@ local function buildUI()
         end
     end, Theme.Crimson, 17)
 
-    -- Live stats updater
     task.spawn(function()
         while ScreenGui.Parent do
             pcall(function()
@@ -2239,9 +2176,6 @@ local function buildUI()
     return ScreenGui
 end
 
--- ============================================
--- BOOT
--- ============================================
 print("[P] Stage 1: services loaded")
 
 local gui = buildUI()
@@ -2272,16 +2206,16 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 task.wait(0.3)
-notify("P | Thanos Simulator", "v6.0 loaded", Theme.Purple, 4)
+notify("P | Thanos Simulator", "v6.1 loaded", Theme.Purple, 4)
 task.wait(0.2)
-notify("Auto-Farm Ready", "Click weapon COLLECT to auto-farm", Theme.Emerald, 4)
+notify("Tabs Fixed", "All tabs now scroll properly", Theme.Emerald, 4)
 task.wait(0.2)
-notify("Starfield UI", "Drag title bar anywhere", Theme.Gold, 4)
+notify("Floating Stars", "Stars drift around the UI", Theme.Gold, 4)
 
 pcall(function()
     StarterGui:SetCore("SendNotification", {
         Title = "P | Thanos Simulator",
-        Text = "Loaded. Click COLLECT to auto-farm requirements.",
+        Text = "Loaded. All tabs working.",
         Duration = 6,
     })
 end)

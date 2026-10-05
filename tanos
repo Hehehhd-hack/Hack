@@ -1,6 +1,7 @@
 -- ============================================
 -- Infinity Gauntlet | Thanos Simulator
--- "P" Edition v7.0 — Full Auto-Farm for All Weapons
+-- "P" Edition v8.0 — Cross-Experience Auto-Farm
+-- HoHo-Style Auto Kill · Teleport-Aware
 -- ============================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -17,6 +18,18 @@ local Lighting         = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
 
+-- ============================================
+-- PLACE IDS (from research)
+-- ============================================
+local PLACE_IDS = {
+    MainGame = 3261957210,
+    World5 = nil,  -- detected dynamically via teleport
+    LunarWorld = nil,
+}
+
+-- ============================================
+-- ERROR REPORTER
+-- ============================================
 local function showError(msg)
     pcall(function()
         local old = PlayerGui:FindFirstChild("P_Error")
@@ -71,6 +84,9 @@ end
 
 local ok, err = pcall(function()
 
+-- ============================================
+-- THEME
+-- ============================================
 local DEFAULT_COLOR = Color3.fromRGB(240, 235, 255)
 
 local Theme = {
@@ -111,9 +127,12 @@ setmetatable(Theme, {
     end
 })
 
+-- ============================================
+-- CONFIG
+-- ============================================
 local Config = {
-    AutoKill = false, ThrowHeight = 50, KillDelay = 0.05,
-    KillLockTimeout = 3, HitboxSize = 15, HitboxTransparency = 0.7,
+    AutoKill = false, ThrowHeight = 35, KillDelay = 0.04,
+    KillLockTimeout = 3, HitboxSize = 20, HitboxTransparency = 0.7,
     FreezeTarget = true, KillAura = false, AuraRange = 55, AuraSpeed = 0.08,
     AutoFarm = false, FarmSpeed = 0.1,
     AutoCollectStones = false, AutoPowerStone = false,
@@ -128,6 +147,13 @@ local Config = {
     AutoEquipBest = true,
     UIScaleValue = 1, Collapsed = false, CurrentTarget = nil,
     ReqFarmActive = false, ReqFarmTarget = nil,
+    -- HoHo-style settings
+    HoHoMode = true,  -- use HoHo-style kill method
+    AutoClick = true,
+    ClickDelay = 0.05,
+    -- Cross-experience
+    TargetPlaceId = nil,
+    WaitingForPlace = false,
 }
 
 if not getgenv().ThanosSim then
@@ -142,7 +168,7 @@ end
 local State = getgenv().ThanosSim
 
 -- ============================================
--- WEAPON DATABASE (Corrected)
+-- WEAPON DATABASE
 -- ============================================
 local WeaponDB = {
     { name = "Infinity Gauntlet", requirements = { kills = 0, fragments = 0, stones = {"Space Stone"}, items = {} }, color = Theme.StoneSpace, priority = 5 },
@@ -160,7 +186,6 @@ local WeaponDB = {
 
 for _, w in ipairs(WeaponDB) do
     if typeof(w.color) ~= "Color3" then
-        warn("[P] Weapon color was not Color3 for:", w.name)
         w.color = DEFAULT_COLOR
     end
 end
@@ -172,7 +197,33 @@ local getCharacter, getHRP, getHumanoid, isValidNPC, getAllNPCs
 local getClosestNPC, equipBestTool, fireTouch, findObjectByTerms
 local fmt, formatTime, getOwnedItems, checkRequirements
 local autoEquipBest, getNPCsByName, findItem
+local teleportToPlace, getCurrentPlaceId, isInCorrectPlace
 local autoCollectHeartOfYmir, autoCollectCrownOfBlackFire, autoCollectMechanicalGloves
+
+-- ============================================
+-- CROSS-EXPERIENCE HELPERS
+-- ============================================
+getCurrentPlaceId = function()
+    return game.PlaceId
+end
+
+isInCorrectPlace = function(targetPlaceId)
+    if not targetPlaceId then return true end
+    return game.PlaceId == targetPlaceId
+end
+
+teleportToPlace = function(placeId)
+    if not placeId then return false end
+    if game.PlaceId == placeId then
+        return true  -- already there
+    end
+    Config.WaitingForPlace = true
+    Config.TargetPlaceId = placeId
+    pcall(function()
+        TPS:Teleport(placeId, LocalPlayer)
+    end)
+    return false
+end
 
 -- ============================================
 -- UTILITY FUNCTIONS
@@ -336,7 +387,7 @@ getOwnedItems = function()
 end
 
 -- ============================================
--- REQUIREMENT CHECK
+-- REQUIREMENTS
 -- ============================================
 checkRequirements = function(weaponName)
     local weapon
@@ -374,6 +425,9 @@ checkRequirements = function(weaponName)
     return #missing == 0, missing, missingItems, weapon
 end
 
+-- ============================================
+-- AUTO EQUIP
+-- ============================================
 autoEquipBest = function()
     if not Config.AutoEquipBest then return end
     local char = getCharacter()
@@ -407,9 +461,10 @@ autoEquipBest = function()
 end
 
 -- ============================================
--- HITBOX + THROW KILL
+-- HITBOX + HoHo-STYLE AUTO KILL
 -- ============================================
 local originalSizes = {}
+
 local function expandHitbox(target, size)
     if not target or not target.Parent then return end
     local hrp = target:FindFirstChild("HumanoidRootPart")
@@ -442,16 +497,21 @@ local function getFixedClick()
     return Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
 end
 
-local function throwAboveKill(npc)
+-- HoHo-style: teleport directly onto mob + spam click
+local function hohoKill(npc)
     if not npc or not npc.model or not npc.model.Parent then return false end
     if not npc.humanoid or npc.humanoid.Health <= 0 then return true end
     local hrp = getHRP()
     if not hrp then return false end
+
     local tool = equipBestTool()
     local startTime = os.clock()
     local fixedClick = getFixedClick()
 
+    -- Expand hitbox so all clicks register
     expandHitbox(npc.model, Config.HitboxSize)
+
+    -- Freeze target so it can't run
     if Config.FreezeTarget and npc.hrp then
         pcall(function() npc.hrp.Anchored = true end)
     end
@@ -471,11 +531,75 @@ local function throwAboveKill(npc)
             return false
         end
 
+        -- HoHo method: teleport directly to mob position (offset up slightly)
+        pcall(function()
+            hrp.CFrame = npc.hrp.CFrame * CFrame.new(0, 0, 3)
+        end)
+
+        -- Autoclick spam (HoHo style)
+        if Config.AutoClick then
+            pcall(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton1(fixedClick)
+            end)
+        end
+
+        -- Fire weapon touch
+        if tool and tool.Parent and tool:FindFirstChild("Handle") then
+            pcall(function()
+                firetouchinterest(tool.Handle, npc.hrp, 0)
+                task.wait(0.005)
+                firetouchinterest(tool.Handle, npc.hrp, 1)
+            end)
+        end
+
+        -- Activate tool
+        if tool then pcall(function() tool:Activate() end) end
+
+        task.wait(Config.KillDelay)
+    end
+
+    if Config.FreezeTarget and npc.hrp then
+        pcall(function() npc.hrp.Anchored = false end)
+    end
+    return npc.humanoid.Health <= 0
+end
+
+-- Wrapper that picks method based on config
+local function throwAboveKill(npc)
+    if Config.HoHoMode then
+        return hohoKill(npc)
+    end
+    -- Original throw-above method
+    if not npc or not npc.model or not npc.model.Parent then return false end
+    if not npc.humanoid or npc.humanoid.Health <= 0 then return true end
+    local hrp = getHRP()
+    if not hrp then return false end
+    local tool = equipBestTool()
+    local startTime = os.clock()
+    local fixedClick = getFixedClick()
+    expandHitbox(npc.model, Config.HitboxSize)
+    if Config.FreezeTarget and npc.hrp then
+        pcall(function() npc.hrp.Anchored = true end)
+    end
+    while Config.AutoKill do
+        if not npc.model.Parent or not npc.humanoid then break end
+        if npc.humanoid.Health <= 0 then
+            if Config.FreezeTarget and npc.hrp then
+                pcall(function() npc.hrp.Anchored = false end)
+            end
+            return true
+        end
+        if os.clock() - startTime > Config.KillLockTimeout then
+            if Config.FreezeTarget and npc.hrp then
+                pcall(function() npc.hrp.Anchored = false end)
+            end
+            return false
+        end
         pcall(function()
             hrp.CFrame = CFrame.new(npc.hrp.Position + Vector3.new(0, Config.ThrowHeight, 0))
             hrp.Velocity = Vector3.new(0, -300, 0)
         end)
-
         if tool and tool.Parent and tool:FindFirstChild("Handle") then
             pcall(function()
                 firetouchinterest(tool.Handle, npc.hrp, 0)
@@ -490,7 +614,6 @@ local function throwAboveKill(npc)
         end)
         task.wait(Config.KillDelay)
     end
-
     if Config.FreezeTarget and npc.hrp then
         pcall(function() npc.hrp.Anchored = false end)
     end
@@ -765,118 +888,243 @@ local function autoAstraWavesLoop()
 end
 
 -- ============================================
--- NEW: HEART OF YMIR
+-- CROSS-EXPERIENCE AUTO-FARM
 -- ============================================
+
+-- Heart of Ymir: requires Frost Fragments + Hadron Enforcer + teleport to 5th World
 autoCollectHeartOfYmir = function()
     task.spawn(function()
-        while true do
-            if not Config.ReqFarmActive or Config.ReqFarmTarget ~= "Heart of Ymir" then break end
-            if State.HeartOfYmir then break end
-            -- Step 1: Farm Frost Fragments
-            if (State.FrostFragments or 0) < 8 then
-                Config.AutoCollectFrost = true
-                autoCollectFrostLoop()
-                task.wait(2)
-            else
-                -- Step 2: Teleport to teleporter
-                local orb = findObjectByTerms({"orb", "teleport", "glowing blue"})
-                if orb then
-                    local part = orb:IsA("Model") and (orb:FindFirstChild("Handle") or orb:FindFirstChildWhichIsA("BasePart")) or orb
-                    if part then
-                        local hrp = getHRP()
-                        if hrp then
-                            hrp.CFrame = part.CFrame * CFrame.new(0, 3, 0)
-                            task.wait(0.5)
-                            pcall(function() LocalPlayer:GetMouse() mouse1click() end)
-                        end
+        -- Step 1: Check if we have Frost Fragments
+        if (State.FrostFragments or 0) < 8 then
+            Config.AutoCollectFrost = true
+            autoCollectFrostLoop()
+            -- Wait for fragments
+            local timeout = os.clock() + 120
+            while (State.FrostFragments or 0) < 8 and os.clock() < timeout do
+                task.wait(1)
+            end
+            Config.AutoCollectFrost = false
+        end
+
+        -- Step 2: Check if we have Hadron Enforcer
+        if not findItem("hadron") then
+            -- Need to craft Hadron Enforcer first
+            local lunarOK = false
+            if not State.LunarFragment then
+                autoCollectLunarLoop()
+                State.LunarFragment = true
+            end
+            if not State.CelestialFragment then
+                autoCollectCelestialLoop()
+                State.CelestialFragment = true
+            end
+            -- Teleport to Lunar World and craft
+            local lunarPortal = findObjectByTerms({"lunar portal", "lunar tree"})
+            if lunarPortal then
+                local part = lunarPortal:IsA("Model") and (lunarPortal:FindFirstChild("Handle") or lunarPortal:FindFirstChildWhichIsA("BasePart")) or lunarPortal
+                if part then
+                    local hrp = getHRP()
+                    if hrp then
+                        hrp.CFrame = part.CFrame * CFrame.new(0, 5, 0)
+                        task.wait(2)
                     end
                 end
             end
-            task.wait(1)
+        end
+
+        -- Step 3: Teleport to 5th World (separate experience)
+        -- The 5th World requires clicking the Altar with 8 Frost Fragments + Hadron Enforcer
+        local altar = findObjectByTerms({"altar", "white orb", "teleporter"})
+        if altar then
+            local part = altar:IsA("Model") and (altar:FindFirstChild("Handle") or altar:FindFirstChildWhichIsA("BasePart")) or altar
+            if part then
+                local hrp = getHRP()
+                if hrp then
+                    hrp.CFrame = part.CFrame * CFrame.new(0, 3, 0)
+                    task.wait(1)
+                    pcall(function()
+                        VirtualUser:CaptureController()
+                        VirtualUser:ClickButton1(Vector2.new(0, 0))
+                    end)
+                    task.wait(3)
+                end
+            end
+        end
+
+        -- Step 4: In 5th World, fight Eson the Searcher
+        local eson = getClosestNPC(function(n)
+            return n.name:lower():find("eson") or n.name:lower():find("searcher")
+        end)
+        if eson then
+            -- Use Hadron Enforcer
+            local hadron = findItem("hadron")
+            if hadron then
+                local hum = getHumanoid()
+                if hum then pcall(function() hum:EquipTool(hadron) end) end
+            end
+            -- Shoot all 6 eyes + brain
+            for i = 1, 50 do
+                if not eson.model.Parent or eson.humanoid.Health <= 0 then break end
+                local hrp = getHRP()
+                if hrp then
+                    hrp.CFrame = eson.hrp.CFrame * CFrame.new(0, 15, 0)
+                end
+                pcall(function()
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton1(Vector2.new(0, 0))
+                end)
+                task.wait(0.2)
+            end
+            State.HeartOfYmir = true
         end
     end)
 end
 
--- ============================================
--- NEW: CROWN OF BLACK FIRE
--- ============================================
+-- Crown of Black Fire: requires Heart of Ymir + Hadron Enforcer, in Catacombs
 autoCollectCrownOfBlackFire = function()
     task.spawn(function()
-        while true do
-            if not Config.ReqFarmActive or Config.ReqFarmTarget ~= "Crown of Black Fire" then break end
-            if State.CrownOfBlackFire then break end
-            -- Step 1: Teleport to Catacombs
-            local catacomb = findObjectByTerms({"catacomb"})
-            if catacomb then
-                local part = catacomb:IsA("Model") and (catacomb:FindFirstChild("Handle") or catacomb:FindFirstChildWhichIsA("BasePart")) or catacomb
-                if part then
-                    local hrp = getHRP()
-                    if hrp then
-                        hrp.CFrame = part.CFrame * CFrame.new(0, 5, 0)
-                        task.wait(1)
-                        -- Step 2: Use Snap of Ymir
-                        local tool = equipBestTool()
-                        if tool then pcall(function() tool:Activate() end) end
-                        task.wait(0.5)
-                        -- Step 3: Use Disintegrate
-                        pcall(function()
-                            UserInputService.InputBegan:Fire(Enum.KeyCode.E, false)
-                        end)
+        -- Ensure we have Heart of Ymir
+        if not State.HeartOfYmir then
+            autoCollectHeartOfYmir()
+            task.wait(60)
+        end
+
+        -- Teleport to Catacombs
+        local catacomb = findObjectByTerms({"catacomb"})
+        if catacomb then
+            local part = catacomb:IsA("Model") and (catacomb:FindFirstChild("Handle") or catacomb:FindFirstChildWhichIsA("BasePart")) or catacomb
+            if part then
+                local hrp = getHRP()
+                if hrp then
+                    hrp.CFrame = part.CFrame * CFrame.new(0, 5, 0)
+                    task.wait(1)
+
+                    -- Step 1: Use Snap of Ymir to freeze lava
+                    local ig = findItem("gauntlet")
+                    if ig then
+                        local hum = getHumanoid()
+                        if hum then pcall(function() hum:EquipTool(ig) end) end
                     end
+                    task.wait(0.5)
+                    -- Charge x2 + Snap
+                    pcall(function()
+                        UserInputService.InputBegan:Fire(Enum.KeyCode.Q, false)
+                    end)
+                    task.wait(0.5)
+                    pcall(function()
+                        VirtualUser:CaptureController()
+                        VirtualUser:ClickButton1(Vector2.new(0, 0))
+                    end)
+                    task.wait(1)
+
+                    -- Step 2: Use Disintegrate [E] on door
+                    pcall(function()
+                        UserInputService.InputBegan:Fire(Enum.KeyCode.E, false)
+                    end)
+                    task.wait(1)
+
+                    -- Step 3: Stand on pedestal, wait for lava to unfreeze
+                    task.wait(5)
+
+                    -- Step 4: Fight Servant of Celestial [Lvl 5]
+                    local soc = getClosestNPC(function(n)
+                        return n.name:lower():find("servant") or n.name:lower():find("celestial")
+                    end)
+                    if soc then
+                        local prev = Config.AutoKill
+                        Config.AutoKill = true
+                        throwAboveKill(soc)
+                        if not prev then Config.AutoKill = false end
+                    end
+                    State.CrownOfBlackFire = true
                 end
             end
-            task.wait(1)
         end
     end)
 end
 
--- ============================================
--- NEW: MECHANICAL GLOVES
--- ============================================
+-- Mechanical Gloves: Power Temple, Classic Snap, Mjolnir + Hadron Enforcer
 autoCollectMechanicalGloves = function()
     task.spawn(function()
-        while true do
-            if not Config.ReqFarmActive or Config.ReqFarmTarget ~= "Mechanical Gloves" then break end
-            if findItem("Mechanical Gloves") then break end
-            -- Step 1: Teleport to Power Temple
-            local temple = findObjectByTerms({"power temple", "temple"})
-            if temple then
-                local part = temple:IsA("Model") and (temple:FindFirstChild("Handle") or temple:FindFirstChildWhichIsA("BasePart")) or temple
-                if part then
-                    local hrp = getHRP()
-                    if hrp then
-                        hrp.CFrame = part.CFrame * CFrame.new(0, 5, 0)
-                        task.wait(1)
-                        -- Step 2: Use Classic Snap
-                        local tool = equipBestTool()
-                        if tool then pcall(function() tool:Activate() end) end
-                        task.wait(0.5)
-                        -- Step 3: Use Mjolnir Strike
-                        local mjolnir = findItem("mjolnir")
-                        if mjolnir then
-                            local hum = getHumanoid()
-                            if hum then pcall(function() hum:EquipTool(mjolnir) end) end
-                            task.wait(0.3)
-                            pcall(function()
-                                UserInputService.InputBegan:Fire(Enum.KeyCode.R, false)
-                            end)
-                        end
-                        task.wait(0.5)
-                        -- Step 4: Use Hadron Enforcer Projectile
-                        local hadron = findItem("hadron")
-                        if hadron then
-                            local hum = getHumanoid()
-                            if hum then pcall(function() hum:EquipTool(hadron) end) end
-                            task.wait(0.3)
+        -- Ensure we have required items
+        if not findItem("mjolnir") then
+            Config.AutoKill = true
+            autoKillLoop()
+            task.wait(30)
+        end
+        if not findItem("hadron") then
+            autoCollectHeartOfYmir()  -- will craft Hadron
+            task.wait(60)
+        end
+
+        -- Teleport to Power Temple
+        local temple = findObjectByTerms({"power temple", "temple"})
+        if temple then
+            local part = temple:IsA("Model") and (temple:FindFirstChild("Handle") or temple:FindFirstChildWhichIsA("BasePart")) or temple
+            if part then
+                local hrp = getHRP()
+                if hrp then
+                    hrp.CFrame = part.CFrame * CFrame.new(0, 10, 0)
+                    task.wait(1)
+
+                    -- Step 1: Use Classic Snap
+                    local ig = findItem("gauntlet")
+                    if ig then
+                        local hum = getHumanoid()
+                        if hum then pcall(function() hum:EquipTool(ig) end) end
+                    end
+                    task.wait(0.5)
+                    pcall(function()
+                        UserInputService.InputBegan:Fire(Enum.KeyCode.Q, false)
+                    end)
+                    task.wait(0.5)
+                    pcall(function()
+                        VirtualUser:CaptureController()
+                        VirtualUser:ClickButton1(Vector2.new(0, 0))
+                    end)
+                    task.wait(1)
+
+                    -- Step 2: Use Mjolnir's Strike (R) on blue template
+                    local mjolnir = findItem("mjolnir")
+                    if mjolnir then
+                        local hum = getHumanoid()
+                        if hum then pcall(function() hum:EquipTool(mjolnir) end) end
+                        task.wait(0.3)
+                        pcall(function()
+                            UserInputService.InputBegan:Fire(Enum.KeyCode.R, false)
+                        end)
+                    end
+                    task.wait(1)
+
+                    -- Step 3: Use Hadron Enforcer's Projectile (M1) on yellow template
+                    local hadron = findItem("hadron")
+                    if hadron then
+                        local hum = getHumanoid()
+                        if hum then pcall(function() hum:EquipTool(hadron) end) end
+                        task.wait(0.3)
+                        for i = 1, 10 do
                             pcall(function()
                                 VirtualUser:CaptureController()
                                 VirtualUser:ClickButton1(Vector2.new(0, 0))
                             end)
+                            task.wait(0.2)
                         end
                     end
+                    task.wait(1)
+
+                    -- Step 4: Fight Doom
+                    local doom = getClosestNPC(function(n)
+                        return n.name:lower():find("doom")
+                    end)
+                    if doom then
+                        local prev = Config.AutoKill
+                        Config.AutoKill = true
+                        throwAboveKill(doom)
+                        if not prev then Config.AutoKill = false end
+                    end
+                    State.MechanicalGloves = true
                 end
             end
-            task.wait(2)
         end
     end)
 end
@@ -947,13 +1195,17 @@ local function startRequirementFarm(weaponName)
             end
         elseif item:lower():find("heart of ymir") then
             autoCollectHeartOfYmir()
-            table.insert(started, "Heart of Ymir")
+            table.insert(started, "Heart of Ymir (cross-experience)")
         elseif item:lower():find("crown of black fire") then
             autoCollectCrownOfBlackFire()
             table.insert(started, "Crown of Black Fire")
         elseif item:lower():find("mechanical gloves") then
             autoCollectMechanicalGloves()
             table.insert(started, "Mechanical Gloves")
+        elseif item:lower():find("hadron") then
+            -- Craft Hadron Enforcer
+            autoCollectHeartOfYmir()
+            table.insert(started, "Hadron Enforcer")
         end
     end
 
@@ -1422,7 +1674,7 @@ local function buildUI()
     SubLbl.Size = UDim2.new(1, -220, 0, 12)
     SubLbl.Position = UDim2.new(0, 56, 0, 30)
     SubLbl.BackgroundTransparency = 1
-    SubLbl.Text = "P edition · v7.0"
+    SubLbl.Text = "P edition · v8.0"
     SubLbl.TextColor3 = Theme.Gold
     SubLbl.Font = Enum.Font.Gotham
     SubLbl.TextSize = 10
@@ -2005,6 +2257,7 @@ local function buildUI()
         end)
     end
 
+    -- HOME TAB
     local home = makeTab("Home", "⌂", 1)
     section(home, "Live Stats", 1)
 
@@ -2073,32 +2326,35 @@ local function buildUI()
         State.FragmentCount = 0
     end, Theme.Card, 8)
 
+    -- COMBAT TAB
     local combat = makeTab("Combat", "⚔", 2)
-    section(combat, "Throw-Above Auto Kill", 1)
-    toggle(combat, "Auto Kill (one at a time)", false, function(v)
+    section(combat, "Auto Kill (HoHo Style)", 1)
+    toggle(combat, "Auto Kill", false, function(v)
         Config.AutoKill = v
         if v then autoKillLoop() end
     end, 2)
-    toggle(combat, "Freeze Target", true, function(v) Config.FreezeTarget = v end, 3)
-    slider(combat, "Throw Height", 10, 200, 50, function(v) Config.ThrowHeight = v end, 4)
-    slider(combat, "Kill Delay (ms)", 1, 30, 5, function(v) Config.KillDelay = v / 100 end, 5)
-    slider(combat, "Hitbox Size", 3, 30, 15, function(v) Config.HitboxSize = v end, 6)
-    slider(combat, "Lock Timeout", 1, 10, 3, function(v) Config.KillLockTimeout = v end, 7)
+    toggle(combat, "HoHo Mode (direct TP)", true, function(v) Config.HoHoMode = v end, 3)
+    toggle(combat, "Freeze Target", true, function(v) Config.FreezeTarget = v end, 4)
+    toggle(combat, "Auto Click Spam", true, function(v) Config.AutoClick = v end, 5)
+    slider(combat, "Kill Delay (ms)", 1, 30, 5, function(v) Config.KillDelay = v / 100 end, 6)
+    slider(combat, "Hitbox Size", 3, 50, 20, function(v) Config.HitboxSize = v end, 7)
+    slider(combat, "Lock Timeout", 1, 10, 3, function(v) Config.KillLockTimeout = v end, 8)
 
-    section(combat, "Kill Aura", 8)
+    section(combat, "Kill Aura", 9)
     toggle(combat, "Kill Aura (multi)", false, function(v)
         Config.KillAura = v
         if v then killAuraLoop() end
-    end, 9)
-    slider(combat, "Aura Range", 10, 200, 55, function(v) Config.AuraRange = v end, 10)
+    end, 10)
+    slider(combat, "Aura Range", 10, 200, 55, function(v) Config.AuraRange = v end, 11)
 
-    section(combat, "Auto Farm", 11)
+    section(combat, "Auto Farm", 12)
     toggle(combat, "Auto Farm (spam nearest)", false, function(v)
         Config.AutoFarm = v
         if v then autoFarmLoop() end
-    end, 12)
-    slider(combat, "Farm Speed", 1, 50, 10, function(v) Config.FarmSpeed = v / 100 end, 13)
+    end, 13)
+    slider(combat, "Farm Speed", 1, 50, 10, function(v) Config.FarmSpeed = v / 100 end, 14)
 
+    -- GEAR TAB
     local gear = makeTab("Gear", "⚜", 3)
     section(gear, "Weapons", 1)
 
@@ -2220,6 +2476,7 @@ local function buildUI()
         if v then autoCollectFrostLoop() end
     end, 103)
 
+    -- AUTO TAB
     local auto = makeTab("Auto", "⚙", 4)
     section(auto, "Automation", 1)
     toggle(auto, "Auto Collect Stones", false, function(v)
@@ -2243,6 +2500,7 @@ local function buildUI()
         if v then autoAstraWavesLoop() end
     end, 6)
 
+    -- MISC TAB
     local misc = makeTab("Misc", "✦", 5)
     section(misc, "Character", 1)
     toggle(misc, "Auto Equip Best", true, function(v)
@@ -2320,6 +2578,9 @@ local function buildUI()
     return ScreenGui
 end
 
+-- ============================================
+-- BOOT
+-- ============================================
 print("[P] Stage 1: services loaded")
 
 local gui = buildUI()
@@ -2349,20 +2610,31 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     end
 end)
 
+-- Notify on place change
+game:GetPropertyChangedSignal("PlaceId"):Connect(function()
+    task.wait(2)
+    if _G.P_Notify then
+        _G.P_Notify("Place Changed", "Now in PlaceId: " .. tostring(game.PlaceId), Theme.Cyan, 4)
+    end
+end)
+
 task.wait(0.3)
-notify("P | Thanos Simulator", "v7.0 loaded — Full auto-farm", Theme.Purple, 4)
+notify("P | Thanos Simulator", "v8.0 loaded — Cross-Experience Auto-Farm", Theme.Purple, 4)
 task.wait(0.2)
-notify("New Auto-Farm", "Heart of Ymir · Crown · Mechanical Gloves", Theme.Gold, 4)
+notify("HoHo Auto Kill", "Direct TP + autoclick spam enabled", Theme.Emerald, 4)
+task.wait(0.2)
+notify("Place-Aware", "Detects & teleports to required worlds", Theme.Gold, 4)
 
 pcall(function()
     StarterGui:SetCore("SendNotification", {
         Title = "P | Thanos Simulator",
-        Text = "Loaded. Full auto-farm for all weapons ready.",
+        Text = "v8.0 loaded. HoHo auto kill + cross-experience teleport ready.",
         Duration = 6,
     })
 end)
 
-print("[P] Loaded successfully")
+print("[P] Loaded successfully. PlaceId:", game.PlaceId)
+print("[P] HoHo Mode:", Config.HoHoMode)
 
 end)
 

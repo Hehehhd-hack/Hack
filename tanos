@@ -1,6 +1,6 @@
 -- ============================================
 -- Infinity Gauntlet | Thanos Simulator
--- "P" Edition v6.2 — Float Stars + No TextColor Errors
+-- "P" Edition v7.0 — Full Auto-Farm for All Weapons
 -- ============================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -104,7 +104,6 @@ local Theme = {
     StoneSoul = Color3.fromRGB(255, 130, 40),
 }
 
--- Safety net: any missing key returns a fallback Color3
 setmetatable(Theme, {
     __index = function(t, k)
         warn("[P] Missing Theme key:", tostring(k), "— using fallback")
@@ -136,23 +135,29 @@ if not getgenv().ThanosSim then
         KillCount = 0, FragmentCount = 0, FrostFragments = 0,
         StonesCollected = {}, InitTimestamp = os.time(),
         LunarFragment = false, CelestialFragment = false,
+        HeartOfYmir = false, CrownOfBlackFire = false,
+        HadronEnforcer = false,
     }
 end
 local State = getgenv().ThanosSim
 
+-- ============================================
+-- WEAPON DATABASE (Corrected)
+-- ============================================
 local WeaponDB = {
     { name = "Infinity Gauntlet", requirements = { kills = 0, fragments = 0, stones = {"Space Stone"}, items = {} }, color = Theme.StoneSpace, priority = 5 },
     { name = "Upgraded Infinity Gauntlet", requirements = { kills = 200000, fragments = 0, stones = {}, items = {"Infinity Gauntlet"} }, color = Theme.Purple, priority = 10 },
     { name = "Stormbreaker", requirements = { kills = 750, fragments = 100, stones = {}, items = {} }, color = Theme.Gold, priority = 7 },
     { name = "Mjolnir", requirements = { kills = 0, fragments = 350, stones = {}, items = {"Stormbreaker"} }, color = Theme.Cyan, priority = 8 },
-    { name = "Surtur's Sword", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Heart of Ymir", "Hadron Enforcer", "Crown of Black Fire"} }, color = Theme.Crimson, priority = 9 },
     { name = "Hadron Enforcer", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Lunar Fragment", "Celestial Fragment"} }, color = Theme.Emerald, priority = 6 },
     { name = "Cosmi-Rod", requirements = { kills = 0, fragments = 0, stones = {}, items = {} }, color = Theme.Orange, priority = 4 },
+    { name = "Heart of Ymir", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Hadron Enforcer"} }, color = Theme.Cyan, priority = 4.5 },
+    { name = "Crown of Black Fire", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Heart of Ymir", "Hadron Enforcer"} }, color = Theme.Crimson, priority = 4.8 },
+    { name = "Surtur's Sword", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Heart of Ymir", "Hadron Enforcer", "Crown of Black Fire"} }, color = Theme.Crimson, priority = 9 },
     { name = "Secret Weapon", requirements = { kills = 800, fragments = 0, stones = {}, items = {} }, color = Theme.Pink, priority = 3 },
-    { name = "Mechanical Gloves", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Infinity Gauntlet"} }, color = Theme.Blue, priority = 2 },
+    { name = "Mechanical Gloves", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Infinity Gauntlet", "Mjolnir", "Hadron Enforcer"} }, color = Theme.Blue, priority = 2 },
 }
 
--- Sanitize weapon colors so a nil can never reach TextColor3
 for _, w in ipairs(WeaponDB) do
     if typeof(w.color) ~= "Color3" then
         warn("[P] Weapon color was not Color3 for:", w.name)
@@ -160,11 +165,18 @@ for _, w in ipairs(WeaponDB) do
     end
 end
 
+-- ============================================
+-- FORWARD DECLARATIONS
+-- ============================================
 local getCharacter, getHRP, getHumanoid, isValidNPC, getAllNPCs
 local getClosestNPC, equipBestTool, fireTouch, findObjectByTerms
 local fmt, formatTime, getOwnedItems, checkRequirements
 local autoEquipBest, getNPCsByName, findItem
+local autoCollectHeartOfYmir, autoCollectCrownOfBlackFire, autoCollectMechanicalGloves
 
+-- ============================================
+-- UTILITY FUNCTIONS
+-- ============================================
 getCharacter = function()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
@@ -323,6 +335,9 @@ getOwnedItems = function()
     return items
 end
 
+-- ============================================
+-- REQUIREMENT CHECK
+-- ============================================
 checkRequirements = function(weaponName)
     local weapon
     for _, w in ipairs(WeaponDB) do
@@ -391,8 +406,10 @@ autoEquipBest = function()
     end
 end
 
+-- ============================================
+-- HITBOX + THROW KILL
+-- ============================================
 local originalSizes = {}
-
 local function expandHitbox(target, size)
     if not target or not target.Parent then return end
     local hrp = target:FindFirstChild("HumanoidRootPart")
@@ -480,6 +497,9 @@ local function throwAboveKill(npc)
     return npc.humanoid.Health <= 0
 end
 
+-- ============================================
+-- LOOPS
+-- ============================================
 local function autoKillLoop()
     task.spawn(function()
         while Config.AutoKill do
@@ -616,8 +636,8 @@ local function autoCollectLunarLoop()
         while Config.AutoCollectLunar do
             pcall(function()
                 if State.LunarFragment then return end
-                local n = getNPCsByName("lunar")
-                if #n == 0 then n = getNPCsByName("npc 2") end
+                local n = getNPCsByName("npc 2")
+                if #n == 0 then n = getNPCsByName("lunar") end
                 for _, npc in ipairs(n) do
                     if not Config.AutoCollectLunar then break end
                     local prev = Config.AutoKill
@@ -744,6 +764,126 @@ local function autoAstraWavesLoop()
     end)
 end
 
+-- ============================================
+-- NEW: HEART OF YMIR
+-- ============================================
+autoCollectHeartOfYmir = function()
+    task.spawn(function()
+        while true do
+            if not Config.ReqFarmActive or Config.ReqFarmTarget ~= "Heart of Ymir" then break end
+            if State.HeartOfYmir then break end
+            -- Step 1: Farm Frost Fragments
+            if (State.FrostFragments or 0) < 8 then
+                Config.AutoCollectFrost = true
+                autoCollectFrostLoop()
+                task.wait(2)
+            else
+                -- Step 2: Teleport to teleporter
+                local orb = findObjectByTerms({"orb", "teleport", "glowing blue"})
+                if orb then
+                    local part = orb:IsA("Model") and (orb:FindFirstChild("Handle") or orb:FindFirstChildWhichIsA("BasePart")) or orb
+                    if part then
+                        local hrp = getHRP()
+                        if hrp then
+                            hrp.CFrame = part.CFrame * CFrame.new(0, 3, 0)
+                            task.wait(0.5)
+                            pcall(function() LocalPlayer:GetMouse() mouse1click() end)
+                        end
+                    end
+                end
+            end
+            task.wait(1)
+        end
+    end)
+end
+
+-- ============================================
+-- NEW: CROWN OF BLACK FIRE
+-- ============================================
+autoCollectCrownOfBlackFire = function()
+    task.spawn(function()
+        while true do
+            if not Config.ReqFarmActive or Config.ReqFarmTarget ~= "Crown of Black Fire" then break end
+            if State.CrownOfBlackFire then break end
+            -- Step 1: Teleport to Catacombs
+            local catacomb = findObjectByTerms({"catacomb"})
+            if catacomb then
+                local part = catacomb:IsA("Model") and (catacomb:FindFirstChild("Handle") or catacomb:FindFirstChildWhichIsA("BasePart")) or catacomb
+                if part then
+                    local hrp = getHRP()
+                    if hrp then
+                        hrp.CFrame = part.CFrame * CFrame.new(0, 5, 0)
+                        task.wait(1)
+                        -- Step 2: Use Snap of Ymir
+                        local tool = equipBestTool()
+                        if tool then pcall(function() tool:Activate() end) end
+                        task.wait(0.5)
+                        -- Step 3: Use Disintegrate
+                        pcall(function()
+                            UserInputService.InputBegan:Fire(Enum.KeyCode.E, false)
+                        end)
+                    end
+                end
+            end
+            task.wait(1)
+        end
+    end)
+end
+
+-- ============================================
+-- NEW: MECHANICAL GLOVES
+-- ============================================
+autoCollectMechanicalGloves = function()
+    task.spawn(function()
+        while true do
+            if not Config.ReqFarmActive or Config.ReqFarmTarget ~= "Mechanical Gloves" then break end
+            if findItem("Mechanical Gloves") then break end
+            -- Step 1: Teleport to Power Temple
+            local temple = findObjectByTerms({"power temple", "temple"})
+            if temple then
+                local part = temple:IsA("Model") and (temple:FindFirstChild("Handle") or temple:FindFirstChildWhichIsA("BasePart")) or temple
+                if part then
+                    local hrp = getHRP()
+                    if hrp then
+                        hrp.CFrame = part.CFrame * CFrame.new(0, 5, 0)
+                        task.wait(1)
+                        -- Step 2: Use Classic Snap
+                        local tool = equipBestTool()
+                        if tool then pcall(function() tool:Activate() end) end
+                        task.wait(0.5)
+                        -- Step 3: Use Mjolnir Strike
+                        local mjolnir = findItem("mjolnir")
+                        if mjolnir then
+                            local hum = getHumanoid()
+                            if hum then pcall(function() hum:EquipTool(mjolnir) end) end
+                            task.wait(0.3)
+                            pcall(function()
+                                UserInputService.InputBegan:Fire(Enum.KeyCode.R, false)
+                            end)
+                        end
+                        task.wait(0.5)
+                        -- Step 4: Use Hadron Enforcer Projectile
+                        local hadron = findItem("hadron")
+                        if hadron then
+                            local hum = getHumanoid()
+                            if hum then pcall(function() hum:EquipTool(hadron) end) end
+                            task.wait(0.3)
+                            pcall(function()
+                                VirtualUser:CaptureController()
+                                VirtualUser:ClickButton1(Vector2.new(0, 0))
+                            end)
+                        end
+                    end
+                end
+            end
+            task.wait(2)
+        end
+    end)
+end
+
+-- ============================================
+-- REQUIREMENT FARM LAUNCHER
+-- ============================================
 local function startRequirementFarm(weaponName)
     local canGet, missing, missingItems, weapon = checkRequirements(weaponName)
     if canGet then return true end
@@ -751,6 +891,7 @@ local function startRequirementFarm(weaponName)
 
     local started = {}
 
+    -- Kills
     if weapon.requirements.kills > 0 and (State.KillCount or 0) < weapon.requirements.kills then
         if not Config.AutoKill then
             Config.AutoKill = true
@@ -759,6 +900,7 @@ local function startRequirementFarm(weaponName)
         end
     end
 
+    -- Fragments
     if weapon.requirements.fragments > 0 and (State.FragmentCount or 0) < weapon.requirements.fragments then
         if not Config.AutoTemplarFarm then
             Config.AutoTemplarFarm = true
@@ -767,6 +909,7 @@ local function startRequirementFarm(weaponName)
         end
     end
 
+    -- Stones
     for _, stone in ipairs(weapon.requirements.stones or {}) do
         local key = stone:gsub(" Stone", "")
         if not Config.StonesCollected[key] and not State.StonesCollected[key] then
@@ -779,6 +922,7 @@ local function startRequirementFarm(weaponName)
         end
     end
 
+    -- Items
     for _, item in ipairs(missingItems) do
         if item:lower():find("lunar") then
             if not Config.AutoCollectLunar then
@@ -801,6 +945,15 @@ local function startRequirementFarm(weaponName)
                 autoCollectFrostLoop()
                 table.insert(started, "Frost Fragments")
             end
+        elseif item:lower():find("heart of ymir") then
+            autoCollectHeartOfYmir()
+            table.insert(started, "Heart of Ymir")
+        elseif item:lower():find("crown of black fire") then
+            autoCollectCrownOfBlackFire()
+            table.insert(started, "Crown of Black Fire")
+        elseif item:lower():find("mechanical gloves") then
+            autoCollectMechanicalGloves()
+            table.insert(started, "Mechanical Gloves")
         end
     end
 
@@ -838,6 +991,9 @@ local function reqFarmWatcher()
     end)
 end
 
+-- ============================================
+-- OTHER LOOPS
+-- ============================================
 local function godModeLoop()
     task.spawn(function()
         while Config.GodMode do
@@ -998,6 +1154,9 @@ local function infiniteJumpHandler()
     end)
 end
 
+-- ============================================
+-- NOTIFICATIONS
+-- ============================================
 local NotificationFrame = nil
 
 local function initNotifications(sg)
@@ -1070,6 +1229,9 @@ end
 
 _G.P_Notify = notify
 
+-- ============================================
+-- UI
+-- ============================================
 local ScreenGui, Main, Content, TabBar, UIScale, OpenBtn, StatusDot, StatsBar, FooterLbl
 
 local function buildUI()
@@ -1125,7 +1287,7 @@ local function buildUI()
     UIScale.Scale = 1
     UIScale.Parent = Main
 
-    -- FLOATING STARS
+    -- STARFIELD
     local Starfield = Instance.new("Frame")
     Starfield.Name = "Starfield"
     Starfield.Size = UDim2.new(1, 0, 1, 0)
@@ -1260,7 +1422,7 @@ local function buildUI()
     SubLbl.Size = UDim2.new(1, -220, 0, 12)
     SubLbl.Position = UDim2.new(0, 56, 0, 30)
     SubLbl.BackgroundTransparency = 1
-    SubLbl.Text = "P edition · v6.2"
+    SubLbl.Text = "P edition · v7.0"
     SubLbl.TextColor3 = Theme.Gold
     SubLbl.Font = Enum.Font.Gotham
     SubLbl.TextSize = 10
@@ -2188,14 +2350,14 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 task.wait(0.3)
-notify("P | Thanos Simulator", "v6.2 loaded", Theme.Purple, 4)
+notify("P | Thanos Simulator", "v7.0 loaded — Full auto-farm", Theme.Purple, 4)
 task.wait(0.2)
-notify("Safe Colors", "No more TextColor3 errors", Theme.Emerald, 4)
+notify("New Auto-Farm", "Heart of Ymir · Crown · Mechanical Gloves", Theme.Gold, 4)
 
 pcall(function()
     StarterGui:SetCore("SendNotification", {
         Title = "P | Thanos Simulator",
-        Text = "Loaded successfully.",
+        Text = "Loaded. Full auto-farm for all weapons ready.",
         Duration = 6,
     })
 end)

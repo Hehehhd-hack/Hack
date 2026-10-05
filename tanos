@@ -1,6 +1,6 @@
 -- ============================================
 -- Infinity Gauntlet | Thanos Simulator
--- "P" Edition v6.1 — Float Stars + Fixed Tabs
+-- "P" Edition v6.2 — Float Stars + No TextColor Errors
 -- ============================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -71,6 +71,8 @@ end
 
 local ok, err = pcall(function()
 
+local DEFAULT_COLOR = Color3.fromRGB(240, 235, 255)
+
 local Theme = {
     Bg = Color3.fromRGB(8, 6, 16),
     Panel = Color3.fromRGB(18, 14, 30),
@@ -101,6 +103,14 @@ local Theme = {
     StonePower = Color3.fromRGB(180, 60, 220),
     StoneSoul = Color3.fromRGB(255, 130, 40),
 }
+
+-- Safety net: any missing key returns a fallback Color3
+setmetatable(Theme, {
+    __index = function(t, k)
+        warn("[P] Missing Theme key:", tostring(k), "— using fallback")
+        return DEFAULT_COLOR
+    end
+})
 
 local Config = {
     AutoKill = false, ThrowHeight = 50, KillDelay = 0.05,
@@ -141,6 +151,14 @@ local WeaponDB = {
     { name = "Secret Weapon", requirements = { kills = 800, fragments = 0, stones = {}, items = {} }, color = Theme.Pink, priority = 3 },
     { name = "Mechanical Gloves", requirements = { kills = 0, fragments = 0, stones = {}, items = {"Infinity Gauntlet"} }, color = Theme.Blue, priority = 2 },
 }
+
+-- Sanitize weapon colors so a nil can never reach TextColor3
+for _, w in ipairs(WeaponDB) do
+    if typeof(w.color) ~= "Color3" then
+        warn("[P] Weapon color was not Color3 for:", w.name)
+        w.color = DEFAULT_COLOR
+    end
+end
 
 local getCharacter, getHRP, getHumanoid, isValidNPC, getAllNPCs
 local getClosestNPC, equipBestTool, fireTouch, findObjectByTerms
@@ -997,7 +1015,8 @@ end
 
 local function notify(title, text, color, duration)
     if not NotificationFrame then return end
-    color = color or Theme.Purple
+    if typeof(color) ~= "Color3" then color = Theme.Purple end
+    if typeof(color) ~= "Color3" then color = Color3.fromRGB(160, 90, 255) end
     duration = duration or 3
     local card = Instance.new("Frame")
     card.Size = UDim2.new(1, 0, 0, 52)
@@ -1021,7 +1040,7 @@ local function notify(title, text, color, duration)
     tl.Size = UDim2.new(1, -50, 0, 16)
     tl.Position = UDim2.new(0, 20, 0, 7)
     tl.BackgroundTransparency = 1
-    tl.Text = title
+    tl.Text = tostring(title)
     tl.TextColor3 = color
     tl.Font = Enum.Font.GothamBold
     tl.TextSize = 12
@@ -1030,7 +1049,7 @@ local function notify(title, text, color, duration)
     txl.Size = UDim2.new(1, -50, 0, 22)
     txl.Position = UDim2.new(0, 20, 0, 25)
     txl.BackgroundTransparency = 1
-    txl.Text = text
+    txl.Text = tostring(text)
     txl.TextColor3 = Theme.TextDim
     txl.Font = Enum.Font.Gotham
     txl.TextSize = 10
@@ -1106,9 +1125,7 @@ local function buildUI()
     UIScale.Scale = 1
     UIScale.Parent = Main
 
-    -- ============================================
-    -- FLOATING STARS (drift + twinkle)
-    -- ============================================
+    -- FLOATING STARS
     local Starfield = Instance.new("Frame")
     Starfield.Name = "Starfield"
     Starfield.Size = UDim2.new(1, 0, 1, 0)
@@ -1131,7 +1148,6 @@ local function buildUI()
             star.Parent = Starfield
             Instance.new("UICorner", star).CornerRadius = UDim.new(1, 0)
 
-            -- Floating drift across the whole UI
             task.spawn(function()
                 while star.Parent do
                     local startX = star.Position.X.Scale
@@ -1148,7 +1164,6 @@ local function buildUI()
                 end
             end)
 
-            -- Twinkle
             task.spawn(function()
                 while star.Parent do
                     local t = 0.8 + math.random() * 1.5
@@ -1164,7 +1179,6 @@ local function buildUI()
         end
     end)
 
-    -- Title bar
     local TitleBar = Instance.new("Frame")
     TitleBar.Name = "TitleBar"
     TitleBar.Size = UDim2.new(1, 0, 0, 52)
@@ -1246,7 +1260,7 @@ local function buildUI()
     SubLbl.Size = UDim2.new(1, -220, 0, 12)
     SubLbl.Position = UDim2.new(0, 56, 0, 30)
     SubLbl.BackgroundTransparency = 1
-    SubLbl.Text = "P edition · v6.1"
+    SubLbl.Text = "P edition · v6.2"
     SubLbl.TextColor3 = Theme.Gold
     SubLbl.Font = Enum.Font.Gotham
     SubLbl.TextSize = 10
@@ -1259,7 +1273,7 @@ local function buildUI()
         local b = Instance.new("TextButton")
         b.Size = UDim2.new(0, 26, 0, 26)
         b.Position = UDim2.new(1, xOff, 0.5, -13)
-        b.BackgroundColor3 = bg
+        b.BackgroundColor3 = typeof(bg) == "Color3" and bg or Theme.Card
         b.Text = icon
         b.TextColor3 = Color3.fromRGB(255, 255, 255)
         b.Font = Enum.Font.GothamBold
@@ -1306,7 +1320,7 @@ local function buildUI()
     HelloLbl.Size = UDim2.new(1, -60, 0, 14)
     HelloLbl.Position = UDim2.new(0, 44, 0, 6)
     HelloLbl.BackgroundTransparency = 1
-    HelloLbl.Text = "Hello, " .. LocalPlayer.DisplayName
+    HelloLbl.Text = "Hello, " .. tostring(LocalPlayer.DisplayName)
     HelloLbl.TextColor3 = Theme.Text
     HelloLbl.Font = Enum.Font.GothamBold
     HelloLbl.TextSize = 11
@@ -1326,9 +1340,6 @@ local function buildUI()
     StatsBar.ZIndex = 3
     StatsBar.Parent = Greeting
 
-    -- ============================================
-    -- TAB BAR
-    -- ============================================
     TabBar = Instance.new("ScrollingFrame")
     TabBar.Name = "TabBar"
     TabBar.Size = UDim2.new(1, -16, 0, 36)
@@ -1346,9 +1357,6 @@ local function buildUI()
     tl.Padding = UDim.new(0, 6)
     tl.SortOrder = Enum.SortOrder.LayoutOrder
 
-    -- ============================================
-    -- CONTENT (uses AutomaticCanvasSize)
-    -- ============================================
     Content = Instance.new("ScrollingFrame")
     Content.Name = "Content"
     Content.Size = UDim2.new(1, -16, 1, -168)
@@ -1482,9 +1490,6 @@ local function buildUI()
     UIS.InputChanged:Connect(moveDrag)
     UIS.InputEnded:Connect(endDrag)
 
-    -- ============================================
-    -- TAB SYSTEM (fixed: pages use AutomaticSize)
-    -- ============================================
     local Tabs = {}
 
     local function switchTab(name)
@@ -1528,7 +1533,6 @@ local function buildUI()
         ind.ZIndex = 4
         Instance.new("UICorner", ind).CornerRadius = UDim.new(1, 0)
 
-        -- Page: FIXED - uses AutomaticSize.Y so it grows with children
         local page = Instance.new("Frame")
         page.Name = name .. "Page"
         page.Size = UDim2.new(1, 0, 0, 0)
@@ -1571,7 +1575,7 @@ local function buildUI()
         l.Size = UDim2.new(1, -64, 1, 0)
         l.Position = UDim2.new(0, 14, 0, 0)
         l.BackgroundTransparency = 1
-        l.Text = name
+        l.Text = tostring(name)
         l.TextColor3 = Theme.Text
         l.Font = Enum.Font.Gotham
         l.TextSize = 11
@@ -1616,7 +1620,7 @@ local function buildUI()
     end
 
     local function button(parent, name, callback, accent, order)
-        accent = accent or Theme.PurpleDeep
+        accent = typeof(accent) == "Color3" and accent or Theme.PurpleDeep
         local b = Instance.new("TextButton")
         b.Size = UDim2.new(1, 0, 0, 32)
         b.BackgroundColor3 = Theme.CardSub
@@ -1643,7 +1647,7 @@ local function buildUI()
         lbl.Size = UDim2.new(1, -30, 1, 0)
         lbl.Position = UDim2.new(0, 20, 0, 0)
         lbl.BackgroundTransparency = 1
-        lbl.Text = name
+        lbl.Text = tostring(name)
         lbl.TextColor3 = Theme.Text
         lbl.Font = Enum.Font.Gotham
         lbl.TextSize = 11
@@ -1677,7 +1681,7 @@ local function buildUI()
         l.Size = UDim2.new(1, -60, 0, 14)
         l.Position = UDim2.new(0, 14, 0, 6)
         l.BackgroundTransparency = 1
-        l.Text = name
+        l.Text = tostring(name)
         l.TextColor3 = Theme.Text
         l.Font = Enum.Font.Gotham
         l.TextSize = 10
@@ -1769,7 +1773,7 @@ local function buildUI()
         l.Size = UDim2.new(1, -20, 1, 0)
         l.Position = UDim2.new(0, 14, 0, 0)
         l.BackgroundTransparency = 1
-        l.Text = text:upper()
+        l.Text = tostring(text):upper()
         l.TextColor3 = Theme.PurpleBright
         l.Font = Enum.Font.GothamBold
         l.TextSize = 10
@@ -1791,7 +1795,7 @@ local function buildUI()
         lbl.Size = UDim2.new(0.5, -8, 1, 0)
         lbl.Position = UDim2.new(0, 8, 0, 0)
         lbl.BackgroundTransparency = 1
-        lbl.Text = label
+        lbl.Text = tostring(label)
         lbl.TextColor3 = Theme.Text
         lbl.Font = Enum.Font.Gotham
         lbl.TextSize = 10
@@ -1839,9 +1843,6 @@ local function buildUI()
         end)
     end
 
-    -- ============================================
-    -- HOME TAB
-    -- ============================================
     local home = makeTab("Home", "⌂", 1)
     section(home, "Live Stats", 1)
 
@@ -1866,7 +1867,7 @@ local function buildUI()
         acc.Size = UDim2.new(0, 3, 0.6, 0)
         acc.Position = UDim2.new(0, 6, 0.5, 0)
         acc.AnchorPoint = Vector2.new(0, 0.5)
-        acc.BackgroundColor3 = accent
+        acc.BackgroundColor3 = typeof(accent) == "Color3" and accent or Theme.Purple
         acc.BorderSizePixel = 0
         acc.ZIndex = 5
         Instance.new("UICorner", acc).CornerRadius = UDim.new(1, 0)
@@ -1874,7 +1875,7 @@ local function buildUI()
         lbl.Size = UDim2.new(1, -14, 0, 12)
         lbl.Position = UDim2.new(0, 14, 0, 8)
         lbl.BackgroundTransparency = 1
-        lbl.Text = label
+        lbl.Text = tostring(label)
         lbl.TextColor3 = Theme.TextMuted
         lbl.Font = Enum.Font.Gotham
         lbl.TextSize = 9
@@ -1910,9 +1911,6 @@ local function buildUI()
         State.FragmentCount = 0
     end, Theme.Card, 8)
 
-    -- ============================================
-    -- COMBAT TAB
-    -- ============================================
     local combat = makeTab("Combat", "⚔", 2)
     section(combat, "Throw-Above Auto Kill", 1)
     toggle(combat, "Auto Kill (one at a time)", false, function(v)
@@ -1939,9 +1937,6 @@ local function buildUI()
     end, 12)
     slider(combat, "Farm Speed", 1, 50, 10, function(v) Config.FarmSpeed = v / 100 end, 13)
 
-    -- ============================================
-    -- GEAR TAB
-    -- ============================================
     local gear = makeTab("Gear", "⚜", 3)
     section(gear, "Weapons", 1)
 
@@ -2009,13 +2004,6 @@ local function buildUI()
         collectBtn.ZIndex = 4
         Instance.new("UICorner", collectBtn).CornerRadius = UDim.new(0, 7)
 
-        collectBtn.MouseEnter:Connect(function()
-            TweenService:Create(collectBtn, TweenInfo.new(0.12), {BackgroundColor3 = w.color:Lerp(Color3.new(1,1,1), 0.2)}):Play()
-        end)
-        collectBtn.MouseLeave:Connect(function()
-            TweenService:Create(collectBtn, TweenInfo.new(0.12), {BackgroundColor3 = w.color}):Play()
-        end)
-
         collectBtn.MouseButton1Click:Connect(function()
             task.spawn(function()
                 local canGet, missing, missingItems = checkRequirements(w.name)
@@ -2070,9 +2058,6 @@ local function buildUI()
         if v then autoCollectFrostLoop() end
     end, 103)
 
-    -- ============================================
-    -- AUTO TAB
-    -- ============================================
     local auto = makeTab("Auto", "⚙", 4)
     section(auto, "Automation", 1)
     toggle(auto, "Auto Collect Stones", false, function(v)
@@ -2096,9 +2081,6 @@ local function buildUI()
         if v then autoAstraWavesLoop() end
     end, 6)
 
-    -- ============================================
-    -- MISC TAB
-    -- ============================================
     local misc = makeTab("Misc", "✦", 5)
     section(misc, "Character", 1)
     toggle(misc, "Auto Equip Best", true, function(v)
@@ -2206,16 +2188,14 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 task.wait(0.3)
-notify("P | Thanos Simulator", "v6.1 loaded", Theme.Purple, 4)
+notify("P | Thanos Simulator", "v6.2 loaded", Theme.Purple, 4)
 task.wait(0.2)
-notify("Tabs Fixed", "All tabs now scroll properly", Theme.Emerald, 4)
-task.wait(0.2)
-notify("Floating Stars", "Stars drift around the UI", Theme.Gold, 4)
+notify("Safe Colors", "No more TextColor3 errors", Theme.Emerald, 4)
 
 pcall(function()
     StarterGui:SetCore("SendNotification", {
         Title = "P | Thanos Simulator",
-        Text = "Loaded. All tabs working.",
+        Text = "Loaded successfully.",
         Duration = 6,
     })
 end)

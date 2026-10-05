@@ -1,6 +1,6 @@
 -- ============================================
 -- Infinity Gauntlet | Thanos Simulator
--- "P" Edition v5.1 — Click-Toggle + HoHo AutoKill
+-- "P" Edition v6.0 — Starfield UI + Auto-Farm
 -- ============================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -17,9 +17,6 @@ local Lighting         = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
 
--- ============================================
--- ERROR REPORTER
--- ============================================
 local function showError(msg)
     pcall(function()
         local old = PlayerGui:FindFirstChild("P_Error")
@@ -40,7 +37,7 @@ local function showError(msg)
         t.Size = UDim2.new(1, -20, 0, 30)
         t.Position = UDim2.new(0, 10, 0, 8)
         t.BackgroundTransparency = 1
-        t.Text = "P Script Error — copy this:"
+        t.Text = "P Script Error:"
         t.TextColor3 = Color3.fromRGB(255, 130, 140)
         t.TextSize = 15
         t.Font = Enum.Font.GothamBold
@@ -78,27 +75,31 @@ local ok, err = pcall(function()
 -- THEME
 -- ============================================
 local Theme = {
-    Bg = Color3.fromRGB(12, 10, 20),
-    Panel = Color3.fromRGB(20, 16, 32),
-    PanelLight = Color3.fromRGB(28, 22, 44),
-    Card = Color3.fromRGB(34, 26, 52),
-    CardSub = Color3.fromRGB(42, 34, 62),
-    CardHover = Color3.fromRGB(52, 42, 76),
-    Border = Color3.fromRGB(90, 65, 140),
+    Bg = Color3.fromRGB(8, 6, 16),
+    BgDeep = Color3.fromRGB(4, 3, 10),
+    Panel = Color3.fromRGB(18, 14, 30),
+    PanelLight = Color3.fromRGB(26, 20, 42),
+    Card = Color3.fromRGB(32, 24, 50),
+    CardSub = Color3.fromRGB(40, 32, 60),
+    CardHover = Color3.fromRGB(52, 42, 78),
+    Border = Color3.fromRGB(95, 70, 150),
     BorderDim = Color3.fromRGB(55, 42, 85),
-    Purple = Color3.fromRGB(155, 85, 255),
-    PurpleDeep = Color3.fromRGB(80, 20, 160),
-    PurpleBright = Color3.fromRGB(185, 130, 255),
-    Gold = Color3.fromRGB(255, 200, 70),
-    Crimson = Color3.fromRGB(220, 50, 80),
-    Emerald = Color3.fromRGB(60, 200, 130),
-    Cyan = Color3.fromRGB(100, 200, 240),
-    Orange = Color3.fromRGB(255, 135, 55),
-    Pink = Color3.fromRGB(255, 90, 180),
-    Blue = Color3.fromRGB(80, 120, 220),
-    Text = Color3.fromRGB(240, 235, 255),
-    TextDim = Color3.fromRGB(165, 155, 190),
-    TextMuted = Color3.fromRGB(110, 100, 135),
+    Purple = Color3.fromRGB(160, 90, 255),
+    PurpleDeep = Color3.fromRGB(85, 25, 170),
+    PurpleBright = Color3.fromRGB(195, 140, 255),
+    Gold = Color3.fromRGB(255, 210, 80),
+    GoldBright = Color3.fromRGB(255, 235, 140),
+    GoldDeep = Color3.fromRGB(190, 135, 35),
+    Crimson = Color3.fromRGB(230, 60, 90),
+    Emerald = Color3.fromRGB(70, 220, 140),
+    EmeraldDeep = Color3.fromRGB(30, 130, 85),
+    Cyan = Color3.fromRGB(110, 210, 250),
+    Orange = Color3.fromRGB(255, 145, 60),
+    Pink = Color3.fromRGB(255, 100, 190),
+    Blue = Color3.fromRGB(90, 130, 235),
+    Text = Color3.fromRGB(245, 240, 255),
+    TextDim = Color3.fromRGB(170, 160, 200),
+    TextMuted = Color3.fromRGB(115, 105, 145),
     StoneSpace = Color3.fromRGB(120, 80, 255),
     StoneReality = Color3.fromRGB(220, 40, 60),
     StoneTime = Color3.fromRGB(0, 200, 100),
@@ -126,6 +127,7 @@ local Config = {
     NoClip = false, InfiniteJump = false,
     AutoEquipBest = true,
     UIScaleValue = 1, Collapsed = false, CurrentTarget = nil,
+    ReqFarmActive = false, ReqFarmTarget = nil,
 }
 
 if not getgenv().ThanosSim then
@@ -161,7 +163,7 @@ local fmt, formatTime, getOwnedItems, checkRequirements
 local autoEquipBest, getNPCsByName, findItem
 
 -- ============================================
--- UTILITY FUNCTIONS
+-- UTILITIES
 -- ============================================
 getCharacter = function()
     local char = LocalPlayer.Character
@@ -322,7 +324,7 @@ getOwnedItems = function()
 end
 
 -- ============================================
--- REQUIREMENTS CHECK
+-- REQUIREMENTS
 -- ============================================
 checkRequirements = function(weaponName)
     local weapon
@@ -357,7 +359,7 @@ checkRequirements = function(weaponName)
             table.insert(missingItems, item)
         end
     end
-    return #missing == 0, missing, missingItems
+    return #missing == 0, missing, missingItems, weapon
 end
 
 -- ============================================
@@ -396,7 +398,7 @@ autoEquipBest = function()
 end
 
 -- ============================================
--- HITBOX EXPANDER (HoHo-style)
+-- HITBOX
 -- ============================================
 local originalSizes = {}
 
@@ -427,10 +429,7 @@ local function restoreAllHitboxes()
 end
 
 -- ============================================
--- HoHo-STYLE AUTO KILL
--- Teleports above target with hitbox expanded.
--- Spams attack via tool:Activate + mouse click.
--- Locks onto ONE target until dead, then moves on.
+-- AUTO KILL (HoHo style)
 -- ============================================
 local function getFixedClick()
     local cam = Workspace.CurrentCamera
@@ -447,10 +446,7 @@ local function throwAboveKill(npc)
     local startTime = os.clock()
     local fixedClick = getFixedClick()
 
-    -- Expand the hitbox so hits land reliably even if the model moves
     expandHitbox(npc.model, Config.HitboxSize)
-
-    -- Freeze target so it can't run while being hit
     if Config.FreezeTarget and npc.hrp then
         pcall(function() npc.hrp.Anchored = true end)
     end
@@ -470,13 +466,11 @@ local function throwAboveKill(npc)
             return false
         end
 
-        -- Teleport ABOVE target (HoHo-style slam)
         pcall(function()
             hrp.CFrame = CFrame.new(npc.hrp.Position + Vector3.new(0, Config.ThrowHeight, 0))
             hrp.Velocity = Vector3.new(0, -300, 0)
         end)
 
-        -- Fire weapon hitbox at target
         if tool and tool.Parent and tool:FindFirstChild("Handle") then
             pcall(function()
                 firetouchinterest(tool.Handle, npc.hrp, 0)
@@ -484,16 +478,11 @@ local function throwAboveKill(npc)
                 firetouchinterest(tool.Handle, npc.hrp, 1)
             end)
         end
-
-        -- Activate tool
         if tool then pcall(function() tool:Activate() end) end
-
-        -- Click at center of screen (fixed position)
         pcall(function()
             VirtualUser:CaptureController()
             VirtualUser:ClickButton1(fixedClick)
         end)
-
         task.wait(Config.KillDelay)
     end
 
@@ -503,9 +492,6 @@ local function throwAboveKill(npc)
     return npc.humanoid.Health <= 0
 end
 
--- ============================================
--- AUTO KILL LOOP (HoHo-style target lock)
--- ============================================
 local function autoKillLoop()
     task.spawn(function()
         while Config.AutoKill do
@@ -528,9 +514,6 @@ local function autoKillLoop()
     end)
 end
 
--- ============================================
--- KILL AURA
--- ============================================
 local function killAuraLoop()
     task.spawn(function()
         while Config.KillAura do
@@ -557,9 +540,6 @@ local function killAuraLoop()
     end)
 end
 
--- ============================================
--- AUTO FARM (spam nearest)
--- ============================================
 local function autoFarmLoop()
     task.spawn(function()
         while Config.AutoFarm do
@@ -584,7 +564,7 @@ local function autoFarmLoop()
 end
 
 -- ============================================
--- AUTO COLLECT LOOPS
+-- AUTO-COLLECT LOOPS
 -- ============================================
 local function autoCollectStonesLoop()
     task.spawn(function()
@@ -655,7 +635,10 @@ local function autoCollectLunarLoop()
                 if #n == 0 then n = getNPCsByName("npc 2") end
                 for _, npc in ipairs(n) do
                     if not Config.AutoCollectLunar then break end
+                    local prev = Config.AutoKill
+                    Config.AutoKill = true
                     throwAboveKill(npc)
+                    if not prev then Config.AutoKill = false end
                 end
             end)
             task.wait(0.5)
@@ -705,7 +688,10 @@ local function autoCollectFrostLoop()
                 if #n == 0 then n = getNPCsByName("present") end
                 for _, npc in ipairs(n) do
                     if not Config.AutoCollectFrost then break end
+                    local prev = Config.AutoKill
+                    Config.AutoKill = true
                     throwAboveKill(npc)
+                    if not prev then Config.AutoKill = false end
                     State.FrostFragments = (State.FrostFragments or 0) + 1
                 end
             end)
@@ -719,8 +705,14 @@ local function templarFarmLoop()
         while Config.AutoTemplarFarm do
             pcall(function()
                 local t = getClosestNPC(function(n) return n.name:lower():find("templar") end)
-                if t and throwAboveKill(t) then
-                    State.FragmentCount = (State.FragmentCount or 0) + 1
+                if t then
+                    local prev = Config.AutoKill
+                    Config.AutoKill = true
+                    local killed = throwAboveKill(t)
+                    if not prev then Config.AutoKill = false end
+                    if killed then
+                        State.FragmentCount = (State.FragmentCount or 0) + 1
+                    end
                 end
             end)
             task.wait(0.15)
@@ -755,7 +747,12 @@ local function autoAstraWavesLoop()
         while Config.AutoAstraWaves do
             pcall(function()
                 local a = getClosestNPC(function(n) return n.name:lower():find("astra") end)
-                if a then throwAboveKill(a) end
+                if a then
+                    local prev = Config.AutoKill
+                    Config.AutoKill = true
+                    throwAboveKill(a)
+                    if not prev then Config.AutoKill = false end
+                end
             end)
             task.wait(0.1)
         end
@@ -763,28 +760,110 @@ local function autoAstraWavesLoop()
 end
 
 -- ============================================
--- AUTO-COLLECT FOR WEAPON REQUIREMENTS
+-- AUTO-FARM FOR REQUIREMENTS (the fix)
 -- ============================================
-local function autoCollectForWeapon(weaponName)
-    local _, _, missingItems = checkRequirements(weaponName)
-    if #missingItems == 0 then return end
+local function startRequirementFarm(weaponName)
+    local canGet, missing, missingItems, weapon = checkRequirements(weaponName)
+    if canGet then return true end
+    if not weapon then return false end
+
+    local started = {}
+
+    -- Kills shortfall -> start auto-kill
+    if weapon.requirements.kills > 0 and (State.KillCount or 0) < weapon.requirements.kills then
+        if not Config.AutoKill then
+            Config.AutoKill = true
+            autoKillLoop()
+            table.insert(started, "Auto-Kill")
+        end
+    end
+
+    -- Fragments shortfall -> start templar farm
+    if weapon.requirements.fragments > 0 and (State.FragmentCount or 0) < weapon.requirements.fragments then
+        if not Config.AutoTemplarFarm then
+            Config.AutoTemplarFarm = true
+            templarFarmLoop()
+            table.insert(started, "Templar Farm")
+        end
+    end
+
+    -- Stones -> start stone collect
+    for _, stone in ipairs(weapon.requirements.stones or {}) do
+        local key = stone:gsub(" Stone", "")
+        if not Config.StonesCollected[key] and not State.StonesCollected[key] then
+            if not Config.AutoCollectStones then
+                Config.AutoCollectStones = true
+                autoCollectStonesLoop()
+                table.insert(started, "Stone Collect")
+            end
+            break
+        end
+    end
+
+    -- Missing items -> start specific collector
     for _, item in ipairs(missingItems) do
         if item:lower():find("lunar") then
             if not Config.AutoCollectLunar then
                 Config.AutoCollectLunar = true
+                State.LunarFragment = false
                 autoCollectLunarLoop()
+                table.insert(started, "Lunar Fragment")
             end
         elseif item:lower():find("celestial") then
             if not Config.AutoCollectCelestial then
                 Config.AutoCollectCelestial = true
+                State.CelestialFragment = false
                 autoCollectCelestialLoop()
+                table.insert(started, "Celestial Fragment")
+            end
+        elseif item:lower():find("frost") or item:lower():find("present") then
+            if not Config.AutoCollectFrost then
+                Config.AutoCollectFrost = true
+                State.FrostFragments = 0
+                autoCollectFrostLoop()
+                table.insert(started, "Frost Fragments")
             end
         end
     end
+
+    if #started > 0 then
+        Config.ReqFarmActive = true
+        Config.ReqFarmTarget = weaponName
+        return false, started
+    end
+
+    return false, {}
+end
+
+-- Background loop: check if requirements are now met
+local function reqFarmWatcher()
+    task.spawn(function()
+        while true do
+            if Config.ReqFarmActive and Config.ReqFarmTarget then
+                local canGet = checkRequirements(Config.ReqFarmTarget)
+                if canGet then
+                    Config.ReqFarmActive = false
+                    local name = Config.ReqFarmTarget
+                    Config.ReqFarmTarget = nil
+                    -- stop auto loops
+                    Config.AutoKill = false
+                    Config.AutoTemplarFarm = false
+                    Config.AutoCollectStones = false
+                    Config.AutoCollectLunar = false
+                    Config.AutoCollectCelestial = false
+                    Config.AutoCollectFrost = false
+                    if _G.P_Notify then
+                        _G.P_Notify("Requirements Met", name .. " ready to collect!", Color3.fromRGB(70, 220, 140), 5)
+                    end
+                end
+            end
+            task.wait(2)
+        end
+    end)
 end
 
 -- ============================================
--- GOD MODE / FLY / ANTI-FLING / ESP
+-- OTHER LOOPS
 -- ============================================
 local function godModeLoop()
     task.spawn(function()
@@ -954,12 +1033,13 @@ local NotificationFrame = nil
 local function initNotifications(sg)
     NotificationFrame = Instance.new("Frame")
     NotificationFrame.Name = "Notifications"
-    NotificationFrame.Size = UDim2.new(0, 240, 0, 400)
-    NotificationFrame.Position = UDim2.new(1, -250, 0, 100)
+    NotificationFrame.Size = UDim2.new(0, 260, 0, 500)
+    NotificationFrame.Position = UDim2.new(1, -270, 0, 120)
     NotificationFrame.BackgroundTransparency = 1
+    NotificationFrame.ZIndex = 100
     NotificationFrame.Parent = sg
     local l = Instance.new("UIListLayout", NotificationFrame)
-    l.Padding = UDim.new(0, 5)
+    l.Padding = UDim.new(0, 6)
     l.SortOrder = Enum.SortOrder.LayoutOrder
 end
 
@@ -968,47 +1048,48 @@ local function notify(title, text, color, duration)
     color = color or Theme.Purple
     duration = duration or 3
     local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, 0, 0, 44)
-    card.Position = UDim2.new(1, 30, 0, 0)
+    card.Size = UDim2.new(1, 0, 0, 52)
+    card.Position = UDim2.new(1, 40, 0, 0)
     card.BackgroundColor3 = Theme.PanelLight
     card.BorderSizePixel = 0
+    card.ZIndex = 100
     card.Parent = NotificationFrame
-    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 12)
     local cs = Instance.new("UIStroke", card)
     cs.Color = color
     cs.Thickness = 1.5
-    cs.Transparency = 0.2
+    cs.Transparency = 0.15
     local accent = Instance.new("Frame", card)
-    accent.Size = UDim2.new(0, 3, 1, -12)
-    accent.Position = UDim2.new(0, 6, 0, 6)
+    accent.Size = UDim2.new(0, 3, 1, -14)
+    accent.Position = UDim2.new(0, 8, 0, 7)
     accent.BackgroundColor3 = color
     accent.BorderSizePixel = 0
     Instance.new("UICorner", accent).CornerRadius = UDim.new(1, 0)
     local tl = Instance.new("TextLabel", card)
-    tl.Size = UDim2.new(1, -50, 0, 14)
-    tl.Position = UDim2.new(0, 16, 0, 5)
+    tl.Size = UDim2.new(1, -50, 0, 16)
+    tl.Position = UDim2.new(0, 20, 0, 7)
     tl.BackgroundTransparency = 1
     tl.Text = title
     tl.TextColor3 = color
     tl.Font = Enum.Font.GothamBold
-    tl.TextSize = 11
+    tl.TextSize = 12
     tl.TextXAlignment = Enum.TextXAlignment.Left
     local txl = Instance.new("TextLabel", card)
-    txl.Size = UDim2.new(1, -50, 0, 18)
-    txl.Position = UDim2.new(0, 16, 0, 20)
+    txl.Size = UDim2.new(1, -50, 0, 22)
+    txl.Position = UDim2.new(0, 20, 0, 25)
     txl.BackgroundTransparency = 1
     txl.Text = text
     txl.TextColor3 = Theme.TextDim
     txl.Font = Enum.Font.Gotham
-    txl.TextSize = 9
+    txl.TextSize = 10
     txl.TextXAlignment = Enum.TextXAlignment.Left
     txl.TextWrapped = true
-    TweenService:Create(card, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
+    TweenService:Create(card, TweenInfo.new(0.25, Enum.EasingStyle.Back), {
         Position = UDim2.new(0, 0, 0, 0)
     }):Play()
     task.delay(duration, function()
         TweenService:Create(card, TweenInfo.new(0.2), {
-            Position = UDim2.new(1, 30, 0, 0),
+            Position = UDim2.new(1, 40, 0, 0),
             BackgroundTransparency = 1
         }):Play()
         task.wait(0.25)
@@ -1016,8 +1097,10 @@ local function notify(title, text, color, duration)
     end)
 end
 
+_G.P_Notify = notify
+
 -- ============================================
--- UI BUILDER
+-- UI
 -- ============================================
 local ScreenGui, Main, Content, TabBar, UIScale, OpenBtn, StatusDot, StatsBar, FooterLbl
 
@@ -1052,81 +1135,162 @@ local function buildUI()
     -- Main
     Main = Instance.new("Frame")
     Main.Name = "Main"
-    Main.Size = UDim2.new(0, 560, 0, 360)
-    Main.Position = UDim2.new(0.5, -280, 0.5, -180)
+    Main.Size = UDim2.new(0, 580, 0, 380)
+    Main.Position = UDim2.new(0.5, -290, 0.5, -190)
     Main.BackgroundColor3 = Theme.Bg
     Main.BorderSizePixel = 0
     Main.Active = true
     Main.ClipsDescendants = true
     Main.Parent = ScreenGui
-    Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 16)
+    Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 18)
     local mStroke = Instance.new("UIStroke", Main)
     mStroke.Color = Theme.Border
     mStroke.Thickness = 1.5
-    mStroke.Transparency = 0.2
+    mStroke.Transparency = 0.15
     local mGrad = Instance.new("UIGradient", Main)
-    mGrad.Color = ColorSequence.new(Theme.Bg, Theme.Panel)
+    mGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 12, 36)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(10, 8, 22)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 10, 30)),
+    })
     mGrad.Rotation = 90
 
     UIScale = Instance.new("UIScale")
     UIScale.Scale = 1
     UIScale.Parent = Main
 
-    -- Title bar
+    -- ============================================
+    -- STARFIELD BACKGROUND
+    -- ============================================
+    local Starfield = Instance.new("Frame")
+    Starfield.Name = "Starfield"
+    Starfield.Size = UDim2.new(1, 0, 1, 0)
+    Starfield.BackgroundTransparency = 1
+    Starfield.ClipsDescendants = true
+    Starfield.ZIndex = 0
+    Starfield.Parent = Main
+
+    -- Generate stars
+    task.spawn(function()
+        for i = 1, 60 do
+            if not Starfield.Parent then break end
+            local star = Instance.new("Frame")
+            local sz = math.random(1, 3)
+            star.Size = UDim2.new(0, sz, 0, sz)
+            star.Position = UDim2.new(math.random(), 0, math.random(), 0)
+            star.BackgroundColor3 = i % 5 == 0 and Theme.Gold or Color3.fromRGB(255, 255, 255)
+            star.BorderSizePixel = 0
+            star.ZIndex = 0
+            star.BackgroundTransparency = 0.3 + math.random() * 0.5
+            star.Parent = Starfield
+            Instance.new("UICorner", star).CornerRadius = UDim.new(1, 0)
+
+            -- Twinkle
+            task.spawn(function()
+                while star.Parent do
+                    local t = 0.8 + math.random() * 1.5
+                    local targetT = 0.15 + math.random() * 0.85
+                    pcall(function()
+                        TweenService:Create(star, TweenInfo.new(t, Enum.EasingStyle.Sine), {
+                            BackgroundTransparency = targetT
+                        }):Play()
+                    end)
+                    task.wait(t + 0.5)
+                end
+            end)
+        end
+    end)
+
+    -- Title bar with starfield behind
     local TitleBar = Instance.new("Frame")
     TitleBar.Name = "TitleBar"
-    TitleBar.Size = UDim2.new(1, 0, 0, 48)
+    TitleBar.Size = UDim2.new(1, 0, 0, 52)
     TitleBar.BackgroundColor3 = Theme.Panel
     TitleBar.BorderSizePixel = 0
+    TitleBar.ZIndex = 2
     TitleBar.Parent = Main
-    Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 16)
+    Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 18)
     local tCover = Instance.new("Frame")
     tCover.Size = UDim2.new(1, 0, 0, 14)
     tCover.Position = UDim2.new(0, 0, 1, -14)
     tCover.BackgroundColor3 = Theme.Panel
     tCover.BorderSizePixel = 0
+    tCover.ZIndex = 2
     tCover.Parent = TitleBar
     local tGrad = Instance.new("UIGradient", TitleBar)
     tGrad.Color = ColorSequence.new(Theme.PurpleDeep, Theme.Panel)
+    tGrad.Rotation = 0
+
+    -- Logo with glow
+    local LogoGlow = Instance.new("Frame")
+    LogoGlow.Size = UDim2.new(0, 40, 0, 40)
+    LogoGlow.Position = UDim2.new(0, 12, 0.5, -20)
+    LogoGlow.BackgroundColor3 = Theme.Purple
+    LogoGlow.BackgroundTransparency = 0.7
+    LogoGlow.BorderSizePixel = 0
+    LogoGlow.ZIndex = 2
+    LogoGlow.Parent = TitleBar
+    Instance.new("UICorner", LogoGlow).CornerRadius = UDim.new(1, 0)
 
     local LogoHolder = Instance.new("Frame")
-    LogoHolder.Size = UDim2.new(0, 28, 0, 28)
-    LogoHolder.Position = UDim2.new(0, 14, 0.5, -14)
+    LogoHolder.Size = UDim2.new(0, 30, 0, 30)
+    LogoHolder.Position = UDim2.new(0, 17, 0.5, -15)
     LogoHolder.BackgroundColor3 = Color3.fromRGB(180, 220, 255)
     LogoHolder.BorderSizePixel = 0
+    LogoHolder.ZIndex = 3
     LogoHolder.Parent = TitleBar
     Instance.new("UICorner", LogoHolder).CornerRadius = UDim.new(1, 0)
     local lg = Instance.new("UIGradient", LogoHolder)
-    lg.Color = ColorSequence.new(Color3.fromRGB(160, 210, 255), Color3.fromRGB(120, 150, 240))
+    lg.Color = ColorSequence.new(Color3.fromRGB(180, 220, 255), Color3.fromRGB(120, 150, 240))
     lg.Rotation = 45
     local lc = Instance.new("Frame", LogoHolder)
     lc.Size = UDim2.new(0.7, 0, 0.85, 0)
     lc.Position = UDim2.new(0.35, 0, 0.05, 0)
     lc.BackgroundColor3 = Theme.Panel
     lc.BorderSizePixel = 0
+    lc.ZIndex = 4
     Instance.new("UICorner", lc).CornerRadius = UDim.new(1, 0)
 
     local TitleLbl = Instance.new("TextLabel")
-    TitleLbl.Size = UDim2.new(1, -200, 0, 18)
-    TitleLbl.Position = UDim2.new(0, 50, 0, 8)
+    TitleLbl.Size = UDim2.new(1, -220, 0, 20)
+    TitleLbl.Position = UDim2.new(0, 56, 0, 8)
     TitleLbl.BackgroundTransparency = 1
-    TitleLbl.Text = "THANOS SIMULATOR"
+    TitleLbl.Text = "THANOS  SIMULATOR"
     TitleLbl.TextColor3 = Theme.Text
-    TitleLbl.Font = Enum.Font.GothamBold
-    TitleLbl.TextSize = 14
+    TitleLbl.Font = Enum.Font.GothamBlack
+    TitleLbl.TextSize = 15
     TitleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLbl.ZIndex = 3
     TitleLbl.Active = false
     TitleLbl.Parent = TitleBar
 
+    -- Animated glow on title
+    task.spawn(function()
+        local t = 0
+        while TitleLbl.Parent do
+            t = t + 0.05
+            local shade = 0.85 + math.sin(t) * 0.15
+            pcall(function()
+                TitleLbl.TextColor3 = Color3.fromRGB(
+                    math.floor(245 * shade),
+                    math.floor(240 * shade),
+                    math.floor(255 * shade)
+                )
+            end)
+            task.wait(0.05)
+        end
+    end)
+
     local SubLbl = Instance.new("TextLabel")
-    SubLbl.Size = UDim2.new(1, -200, 0, 12)
-    SubLbl.Position = UDim2.new(0, 50, 0, 27)
+    SubLbl.Size = UDim2.new(1, -220, 0, 12)
+    SubLbl.Position = UDim2.new(0, 56, 0, 30)
     SubLbl.BackgroundTransparency = 1
-    SubLbl.Text = "P edition · v5.1"
+    SubLbl.Text = "P edition · v6.0"
     SubLbl.TextColor3 = Theme.Gold
     SubLbl.Font = Enum.Font.Gotham
     SubLbl.TextSize = 10
     SubLbl.TextXAlignment = Enum.TextXAlignment.Left
+    SubLbl.ZIndex = 3
     SubLbl.Active = false
     SubLbl.Parent = TitleBar
 
@@ -1140,6 +1304,7 @@ local function buildUI()
         b.Font = Enum.Font.GothamBold
         b.TextSize = 13
         b.AutoButtonColor = false
+        b.ZIndex = 3
         b.Parent = TitleBar
         Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
         return b
@@ -1152,10 +1317,11 @@ local function buildUI()
 
     -- Greeting
     local Greeting = Instance.new("Frame")
-    Greeting.Size = UDim2.new(1, -16, 0, 38)
-    Greeting.Position = UDim2.new(0, 8, 0, 54)
+    Greeting.Size = UDim2.new(1, -16, 0, 40)
+    Greeting.Position = UDim2.new(0, 8, 0, 58)
     Greeting.BackgroundColor3 = Theme.Card
     Greeting.BorderSizePixel = 0
+    Greeting.ZIndex = 2
     Greeting.Parent = Main
     Instance.new("UICorner", Greeting).CornerRadius = UDim.new(0, 10)
     local gg = Instance.new("UIGradient", Greeting)
@@ -1163,10 +1329,11 @@ local function buildUI()
     gg.Rotation = 90
 
     local Avatar = Instance.new("ImageLabel")
-    Avatar.Size = UDim2.new(0, 26, 0, 26)
-    Avatar.Position = UDim2.new(0, 8, 0.5, -13)
+    Avatar.Size = UDim2.new(0, 28, 0, 28)
+    Avatar.Position = UDim2.new(0, 8, 0.5, -14)
     Avatar.BackgroundColor3 = Theme.CardSub
     Avatar.BorderSizePixel = 0
+    Avatar.ZIndex = 3
     Avatar.Parent = Greeting
     Instance.new("UICorner", Avatar).CornerRadius = UDim.new(1, 0)
     task.spawn(function()
@@ -1177,54 +1344,59 @@ local function buildUI()
 
     local HelloLbl = Instance.new("TextLabel")
     HelloLbl.Size = UDim2.new(1, -60, 0, 14)
-    HelloLbl.Position = UDim2.new(0, 42, 0, 6)
+    HelloLbl.Position = UDim2.new(0, 44, 0, 6)
     HelloLbl.BackgroundTransparency = 1
     HelloLbl.Text = "Hello, " .. LocalPlayer.DisplayName
     HelloLbl.TextColor3 = Theme.Text
     HelloLbl.Font = Enum.Font.GothamBold
     HelloLbl.TextSize = 11
     HelloLbl.TextXAlignment = Enum.TextXAlignment.Left
+    HelloLbl.ZIndex = 3
     HelloLbl.Parent = Greeting
 
     StatsBar = Instance.new("TextLabel")
     StatsBar.Size = UDim2.new(1, -20, 0, 14)
-    StatsBar.Position = UDim2.new(0, 42, 0, 20)
+    StatsBar.Position = UDim2.new(0, 44, 0, 22)
     StatsBar.BackgroundTransparency = 1
     StatsBar.Text = "kills 0 · stones 0/6 · frags 0"
     StatsBar.TextColor3 = Theme.TextMuted
     StatsBar.Font = Enum.Font.Gotham
     StatsBar.TextSize = 9
     StatsBar.TextXAlignment = Enum.TextXAlignment.Left
+    StatsBar.ZIndex = 3
     StatsBar.Parent = Greeting
 
     -- Tab bar
     TabBar = Instance.new("ScrollingFrame")
     TabBar.Name = "TabBar"
-    TabBar.Size = UDim2.new(1, -16, 0, 34)
-    TabBar.Position = UDim2.new(0, 8, 0, 98)
+    TabBar.Size = UDim2.new(1, -16, 0, 36)
+    TabBar.Position = UDim2.new(0, 8, 0, 104)
     TabBar.BackgroundTransparency = 1
     TabBar.BorderSizePixel = 0
     TabBar.ScrollBarThickness = 0
     TabBar.CanvasSize = UDim2.new(0, 0, 0, 0)
     TabBar.ScrollingDirection = Enum.ScrollingDirection.X
+    TabBar.ZIndex = 2
     TabBar.Parent = Main
     local tl = Instance.new("UIListLayout", TabBar)
     tl.FillDirection = Enum.FillDirection.Horizontal
-    tl.Padding = UDim.new(0, 5)
+    tl.Padding = UDim.new(0, 6)
     tl.SortOrder = Enum.SortOrder.LayoutOrder
 
     -- Content
     Content = Instance.new("ScrollingFrame")
     Content.Name = "Content"
-    Content.Size = UDim2.new(1, -16, 1, -160)
-    Content.Position = UDim2.new(0, 8, 0, 140)
+    Content.Size = UDim2.new(1, -16, 1, -168)
+    Content.Position = UDim2.new(0, 8, 0, 148)
     Content.BackgroundColor3 = Theme.Panel
+    Content.BackgroundTransparency = 0.15
     Content.BorderSizePixel = 0
     Content.CanvasSize = UDim2.new(0, 0, 0, 0)
     Content.ScrollBarThickness = 4
     Content.ScrollBarImageColor3 = Theme.Purple
     Content.ScrollBarImageTransparency = 0.3
     Content.ScrollingDirection = Enum.ScrollingDirection.Y
+    Content.ZIndex = 2
     Content.Parent = Main
     Instance.new("UICorner", Content).CornerRadius = UDim.new(0, 10)
     local cs = Instance.new("UIStroke", Content)
@@ -1237,10 +1409,11 @@ local function buildUI()
 
     -- Footer
     local Footer = Instance.new("Frame")
-    Footer.Size = UDim2.new(1, -16, 0, 24)
-    Footer.Position = UDim2.new(0, 8, 1, -28)
+    Footer.Size = UDim2.new(1, -16, 0, 26)
+    Footer.Position = UDim2.new(0, 8, 1, -30)
     Footer.BackgroundColor3 = Theme.PanelLight
     Footer.BorderSizePixel = 0
+    Footer.ZIndex = 2
     Footer.Parent = Main
     Instance.new("UICorner", Footer).CornerRadius = UDim.new(0, 6)
     Instance.new("UIStroke", Footer).Color = Theme.BorderDim
@@ -1254,12 +1427,14 @@ local function buildUI()
     FooterLbl.Font = Enum.Font.Gotham
     FooterLbl.TextSize = 9
     FooterLbl.TextXAlignment = Enum.TextXAlignment.Left
+    FooterLbl.ZIndex = 3
 
     StatusDot = Instance.new("Frame", Footer)
     StatusDot.Size = UDim2.new(0, 7, 0, 7)
     StatusDot.Position = UDim2.new(1, -16, 0.5, -3)
     StatusDot.BackgroundColor3 = Theme.TextMuted
     StatusDot.BorderSizePixel = 0
+    StatusDot.ZIndex = 3
     Instance.new("UICorner", StatusDot).CornerRadius = UDim.new(1, 0)
 
     -- Collapse
@@ -1269,8 +1444,8 @@ local function buildUI()
         Content.Visible = not state
         Footer.Visible = not state
         Greeting.Visible = not state
-        TweenService:Create(Main, TweenInfo.new(0.18), {
-            Size = state and UDim2.new(0, 300, 0, 48) or UDim2.new(0, 560, 0, 360)
+        TweenService:Create(Main, TweenInfo.new(0.2), {
+            Size = state and UDim2.new(0, 320, 0, 52) or UDim2.new(0, 580, 0, 380)
         }):Play()
     end
 
@@ -1288,7 +1463,7 @@ local function buildUI()
         ScreenGui.Enabled = true
         Main.Size = UDim2.new(0, 0, 0, 0)
         TweenService:Create(Main, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
-            Size = UDim2.new(0, 560, 0, 360)
+            Size = UDim2.new(0, 580, 0, 380)
         }):Play()
     end)
     ResizeMinus.MouseButton1Click:Connect(function()
@@ -1300,7 +1475,7 @@ local function buildUI()
         TweenService:Create(UIScale, TweenInfo.new(0.12), {Scale = Config.UIScaleValue}):Play()
     end)
 
-    -- DRAG (anywhere on screen)
+    -- DRAG
     local dragging, dragStart, startAbsX, startAbsY = false, nil, 0, 0
 
     local function beginDrag(input)
@@ -1344,13 +1519,13 @@ local function buildUI()
     UIS.InputChanged:Connect(moveDrag)
     UIS.InputEnded:Connect(endDrag)
 
-    -- WIDGETS
+    -- Tabs
     local Tabs = {}
     local function switchTab(name)
         for tn, tab in pairs(Tabs) do
             if tn == name then
                 tab.Frame.Visible = true
-                TweenService:Create(tab.Btn, TweenInfo.new(0.12), {BackgroundColor3 = Theme.PurpleDeep}):Play()
+                TweenService:Create(tab.Btn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.PurpleDeep}):Play()
                 tab.Btn.TextColor3 = Theme.Gold
                 tab.Ind.Visible = true
                 Content.CanvasPosition = Vector2.new(0, 0)
@@ -1362,7 +1537,7 @@ local function buildUI()
                 end)
             else
                 tab.Frame.Visible = false
-                TweenService:Create(tab.Btn, TweenInfo.new(0.12), {BackgroundColor3 = Theme.Card}):Play()
+                TweenService:Create(tab.Btn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.Card}):Play()
                 tab.Btn.TextColor3 = Theme.TextDim
                 tab.Ind.Visible = false
             end
@@ -1371,33 +1546,38 @@ local function buildUI()
 
     local function makeTab(name, icon, order)
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 82, 0, 30)
+        btn.Size = UDim2.new(0, 88, 0, 32)
         btn.BackgroundColor3 = Theme.Card
-        btn.Text = icon .. " " .. name
+        btn.Text = icon .. "  " .. name
         btn.TextColor3 = Theme.TextDim
         btn.Font = Enum.Font.GothamBold
         btn.TextSize = 11
         btn.AutoButtonColor = false
         btn.LayoutOrder = order
+        btn.ZIndex = 3
         btn.Parent = TabBar
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 9)
         Instance.new("UIStroke", btn).Color = Theme.BorderDim
 
         local ind = Instance.new("Frame", btn)
-        ind.Size = UDim2.new(0.6, 0, 0, 2)
-        ind.Position = UDim2.new(0.2, 0, 1, -3)
+        ind.Size = UDim2.new(0.5, 0, 0, 2)
+        ind.Position = UDim2.new(0.25, 0, 1, -3)
         ind.BackgroundColor3 = Theme.Gold
         ind.BorderSizePixel = 0
         ind.Visible = false
+        ind.ZIndex = 4
         Instance.new("UICorner", ind).CornerRadius = UDim.new(1, 0)
+        local ig = Instance.new("UIGradient", ind)
+        ig.Color = ColorSequence.new(Theme.GoldBright, Theme.Gold)
 
         local page = Instance.new("Frame")
         page.Size = UDim2.new(1, 0, 0, 0)
         page.BackgroundTransparency = 1
         page.Visible = false
+        page.ZIndex = 3
         page.Parent = Content
         local layout = Instance.new("UIListLayout", page)
-        layout.Padding = UDim.new(0, 6)
+        layout.Padding = UDim.new(0, 7)
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
             page.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y)
@@ -1412,110 +1592,122 @@ local function buildUI()
     end
 
     -- ============================================
-    -- CRITICAL FIX: CLICK-TO-ACTIVATE TOGGLES
-    -- Uses InputBegan on the toggle holder frame.
-    -- Requires MouseButton1/Touch but checks
-    -- that the input is a click (not scroll/drag).
-    -- Scroll uses MouseMovement/TouchPan, which we ignore.
+    -- CLICK-ONLY TOGGLE (fix for scroll)
     -- ============================================
     local function isClickInput(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            return true
-        end
-        if input.UserInputType == Enum.UserInputType.Touch then
-            -- Check if the touch is a tap (short duration, minimal movement)
-            -- We can't easily measure duration here, so we rely on the fact
-            -- that scrolling uses TouchPan not Touch (in most cases)
-            return true
-        end
-        return false
+        return input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch
     end
 
     local function toggle(parent, name, default, callback, order)
         local h = Instance.new("Frame")
-        h.Size = UDim2.new(1, 0, 0, 28)
+        h.Size = UDim2.new(1, 0, 0, 32)
         h.BackgroundColor3 = Theme.CardSub
         h.BorderSizePixel = 0
         h.LayoutOrder = order or 0
+        h.ZIndex = 3
         h.Parent = parent
-        Instance.new("UICorner", h).CornerRadius = UDim.new(0, 8)
+        Instance.new("UICorner", h).CornerRadius = UDim.new(0, 9)
+        local hStroke = Instance.new("UIStroke", h)
+        hStroke.Color = Theme.BorderDim
+        hStroke.Transparency = 0.5
 
         local l = Instance.new("TextLabel", h)
-        l.Size = UDim2.new(1, -60, 1, 0)
-        l.Position = UDim2.new(0, 12, 0, 0)
+        l.Size = UDim2.new(1, -64, 1, 0)
+        l.Position = UDim2.new(0, 14, 0, 0)
         l.BackgroundTransparency = 1
         l.Text = name
         l.TextColor3 = Theme.Text
         l.Font = Enum.Font.Gotham
         l.TextSize = 11
         l.TextXAlignment = Enum.TextXAlignment.Left
+        l.ZIndex = 4
 
         local pill = Instance.new("Frame", h)
-        pill.Size = UDim2.new(0, 34, 0, 18)
-        pill.Position = UDim2.new(1, -44, 0.5, -9)
+        pill.Size = UDim2.new(0, 36, 0, 20)
+        pill.Position = UDim2.new(1, -48, 0.5, -10)
         pill.BackgroundColor3 = default and Theme.Emerald or Theme.Border
         pill.BorderSizePixel = 0
-        Instance.new("UICorner", pill).CornerRadius = UDim.new(0, 9)
+        pill.ZIndex = 4
+        Instance.new("UICorner", pill).CornerRadius = UDim.new(0, 10)
 
         local knob = Instance.new("Frame", pill)
-        knob.Size = UDim2.new(0, 12, 0, 12)
-        knob.Position = default and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
+        knob.Size = UDim2.new(0, 14, 0, 14)
+        knob.Position = default and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
         knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         knob.BorderSizePixel = 0
-        Instance.new("UICorner", knob).CornerRadius = UDim.new(0, 6)
+        knob.ZIndex = 5
+        Instance.new("UICorner", knob).CornerRadius = UDim.new(0, 7)
 
         local state = default
         local function apply(v)
             state = v
-            local tp = state and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
+            local tp = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
             local tc = state and Theme.Emerald or Theme.Border
-            TweenService:Create(knob, TweenInfo.new(0.1), {Position = tp}):Play()
-            TweenService:Create(pill, TweenInfo.new(0.1), {BackgroundColor3 = tc}):Play()
+            TweenService:Create(knob, TweenInfo.new(0.12), {Position = tp}):Play()
+            TweenService:Create(pill, TweenInfo.new(0.12), {BackgroundColor3 = tc}):Play()
+            TweenService:Create(hStroke, TweenInfo.new(0.12), {
+                Color = state and Theme.Emerald or Theme.BorderDim,
+                Transparency = state and 0.3 or 0.5,
+            }):Play()
             if callback then pcall(callback, state) end
         end
 
-        -- ONLY respond to actual clicks, not scroll events
+        -- Critical: only respond to actual clicks
         h.InputBegan:Connect(function(input)
             if isClickInput(input) then
                 apply(not state)
             end
         end)
+
+        return {
+            Set = function(v) apply(v) end,
+            Frame = h,
+        }
     end
 
     local function button(parent, name, callback, accent, order)
         accent = accent or Theme.PurpleDeep
         local b = Instance.new("TextButton")
-        b.Size = UDim2.new(1, 0, 0, 30)
+        b.Size = UDim2.new(1, 0, 0, 32)
         b.BackgroundColor3 = Theme.CardSub
         b.Text = ""
         b.AutoButtonColor = false
         b.LayoutOrder = order or 0
+        b.ZIndex = 3
         b.Parent = parent
-        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 9)
+        local bStroke = Instance.new("UIStroke", b)
+        bStroke.Color = Theme.BorderDim
+        bStroke.Transparency = 0.5
 
         local stripe = Instance.new("Frame", b)
-        stripe.Size = UDim2.new(0, 3, 0.55, 0)
+        stripe.Size = UDim2.new(0, 3, 0.5, 0)
         stripe.Position = UDim2.new(0, 8, 0.5, 0)
         stripe.BackgroundColor3 = accent
         stripe.BorderSizePixel = 0
         stripe.AnchorPoint = Vector2.new(0, 0.5)
+        stripe.ZIndex = 4
         Instance.new("UICorner", stripe).CornerRadius = UDim.new(1, 0)
 
         local lbl = Instance.new("TextLabel", b)
         lbl.Size = UDim2.new(1, -30, 1, 0)
-        lbl.Position = UDim2.new(0, 18, 0, 0)
+        lbl.Position = UDim2.new(0, 20, 0, 0)
         lbl.BackgroundTransparency = 1
         lbl.Text = name
         lbl.TextColor3 = Theme.Text
         lbl.Font = Enum.Font.Gotham
         lbl.TextSize = 11
         lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.ZIndex = 4
 
         b.MouseEnter:Connect(function()
-            TweenService:Create(b, TweenInfo.new(0.1), {BackgroundColor3 = Theme.CardHover}):Play()
+            TweenService:Create(b, TweenInfo.new(0.12), {BackgroundColor3 = Theme.CardHover}):Play()
+            TweenService:Create(bStroke, TweenInfo.new(0.12), {Transparency = 0.2}):Play()
         end)
         b.MouseLeave:Connect(function()
-            TweenService:Create(b, TweenInfo.new(0.1), {BackgroundColor3 = Theme.CardSub}):Play()
+            TweenService:Create(b, TweenInfo.new(0.12), {BackgroundColor3 = Theme.CardSub}):Play()
+            TweenService:Create(bStroke, TweenInfo.new(0.12), {Transparency = 0.5}):Play()
         end)
         b.MouseButton1Click:Connect(function()
             if callback then task.spawn(function() pcall(callback) end) end
@@ -1524,51 +1716,59 @@ local function buildUI()
 
     local function slider(parent, name, min, max, default, callback, order)
         local h = Instance.new("Frame")
-        h.Size = UDim2.new(1, 0, 0, 40)
+        h.Size = UDim2.new(1, 0, 0, 42)
         h.BackgroundColor3 = Theme.CardSub
         h.BorderSizePixel = 0
         h.LayoutOrder = order or 0
+        h.ZIndex = 3
         h.Parent = parent
-        Instance.new("UICorner", h).CornerRadius = UDim.new(0, 8)
+        Instance.new("UICorner", h).CornerRadius = UDim.new(0, 9)
 
         local l = Instance.new("TextLabel", h)
         l.Size = UDim2.new(1, -60, 0, 14)
-        l.Position = UDim2.new(0, 12, 0, 5)
+        l.Position = UDim2.new(0, 14, 0, 6)
         l.BackgroundTransparency = 1
         l.Text = name
         l.TextColor3 = Theme.Text
         l.Font = Enum.Font.Gotham
         l.TextSize = 10
         l.TextXAlignment = Enum.TextXAlignment.Left
+        l.ZIndex = 4
 
         local vLbl = Instance.new("TextLabel", h)
         vLbl.Size = UDim2.new(0, 44, 0, 14)
-        vLbl.Position = UDim2.new(1, -56, 0, 5)
+        vLbl.Position = UDim2.new(1, -56, 0, 6)
         vLbl.BackgroundTransparency = 1
         vLbl.Text = tostring(default)
         vLbl.TextColor3 = Theme.PurpleBright
         vLbl.Font = Enum.Font.GothamBold
         vLbl.TextSize = 10
         vLbl.TextXAlignment = Enum.TextXAlignment.Right
+        vLbl.ZIndex = 4
 
         local track = Instance.new("Frame", h)
-        track.Size = UDim2.new(1, -24, 0, 4)
-        track.Position = UDim2.new(0, 12, 0, 26)
+        track.Size = UDim2.new(1, -28, 0, 4)
+        track.Position = UDim2.new(0, 14, 0, 28)
         track.BackgroundColor3 = Theme.BorderDim
         track.BorderSizePixel = 0
+        track.ZIndex = 4
         Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
 
         local fill = Instance.new("Frame", track)
         fill.Size = UDim2.new((default - min)/(max - min), 0, 1, 0)
         fill.BackgroundColor3 = Theme.Purple
         fill.BorderSizePixel = 0
+        fill.ZIndex = 5
         Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+        local fg = Instance.new("UIGradient", fill)
+        fg.Color = ColorSequence.new(Theme.PurpleBright, Theme.PurpleDeep)
 
         local knob = Instance.new("Frame", track)
-        knob.Size = UDim2.new(0, 11, 0, 11)
-        knob.Position = UDim2.new((default - min)/(max - min), -5, 0.5, -5.5)
-        knob.BackgroundColor3 = Color3.fromRGB(255,255,255)
+        knob.Size = UDim2.new(0, 12, 0, 12)
+        knob.Position = UDim2.new((default - min)/(max - min), -6, 0.5, -6)
+        knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         knob.BorderSizePixel = 0
+        knob.ZIndex = 6
         Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
         Instance.new("UIStroke", knob).Color = Theme.Purple
 
@@ -1580,13 +1780,12 @@ local function buildUI()
             local pct = x / ts
             local val = min + (max - min) * pct
             fill.Size = UDim2.new(pct, 0, 1, 0)
-            knob.Position = UDim2.new(pct, -5, 0.5, -5.5)
+            knob.Position = UDim2.new(pct, -6, 0.5, -6)
             vLbl.Text = tostring(math.floor(val))
             if callback then pcall(callback, math.floor(val)) end
         end
         track.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1
-               or input.UserInputType == Enum.UserInputType.Touch then
+            if isClickInput(input) then
                 draggingS = true; upd(input)
             end
         end)
@@ -1597,78 +1796,184 @@ local function buildUI()
         track.InputChanged:Connect(sd)
         UIS.InputChanged:Connect(sd)
         track.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1
-               or input.UserInputType == Enum.UserInputType.Touch then draggingS = false end
+            if isClickInput(input) then draggingS = false end
         end)
     end
 
-    local function label(parent, text, color, order)
-        local l = Instance.new("TextLabel")
-        l.Size = UDim2.new(1, 0, 0, 14)
+    local function section(parent, text, order)
+        local f = Instance.new("Frame")
+        f.Size = UDim2.new(1, 0, 0, 18)
+        f.BackgroundTransparency = 1
+        f.LayoutOrder = order or 0
+        f.ZIndex = 3
+        f.Parent = parent
+
+        -- Left star accent
+        local star = Instance.new("Frame", f)
+        star.Size = UDim2.new(0, 4, 0, 4)
+        star.Position = UDim2.new(0, 4, 0.5, -2)
+        star.BackgroundColor3 = Theme.Gold
+        star.BorderSizePixel = 0
+        star.ZIndex = 4
+        Instance.new("UICorner", star).CornerRadius = UDim.new(1, 0)
+
+        local l = Instance.new("TextLabel", f)
+        l.Size = UDim2.new(1, -20, 1, 0)
+        l.Position = UDim2.new(0, 14, 0, 0)
         l.BackgroundTransparency = 1
-        l.Text = text
-        l.TextColor3 = color or Theme.TextMuted
-        l.Font = Enum.Font.Gotham
-        l.TextSize = 9
+        l.Text = text:upper()
+        l.TextColor3 = Theme.PurpleBright
+        l.Font = Enum.Font.GothamBold
+        l.TextSize = 10
         l.TextXAlignment = Enum.TextXAlignment.Left
-        l.LayoutOrder = order or 0
-        l.Parent = parent
+        l.ZIndex = 4
+    end
+
+    -- ============================================
+    -- PROGRESS BAR for requirements
+    -- ============================================
+    local function progressBar(parent, label, getCurrent, getMax, order)
+        local h = Instance.new("Frame")
+        h.Size = UDim2.new(1, 0, 0, 26)
+        h.BackgroundColor3 = Theme.CardSub
+        h.BorderSizePixel = 0
+        h.LayoutOrder = order or 0
+        h.ZIndex = 3
+        h.Parent = parent
+        Instance.new("UICorner", h).CornerRadius = UDim.new(0, 6)
+
+        local lbl = Instance.new("TextLabel", h)
+        lbl.Size = UDim2.new(0.5, -8, 1, 0)
+        lbl.Position = UDim2.new(0, 8, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = label
+        lbl.TextColor3 = Theme.Text
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextSize = 10
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.ZIndex = 4
+
+        local valLbl = Instance.new("TextLabel", h)
+        valLbl.Size = UDim2.new(0.5, -8, 1, 0)
+        valLbl.Position = UDim2.new(0.5, 0, 0, 0)
+        valLbl.BackgroundTransparency = 1
+        valLbl.Text = "0/0"
+        valLbl.TextColor3 = Theme.TextGold
+        valLbl.Font = Enum.Font.GothamBold
+        valLbl.TextSize = 10
+        valLbl.TextXAlignment = Enum.TextXAlignment.Right
+        valLbl.ZIndex = 4
+
+        local track = Instance.new("Frame", h)
+        track.Size = UDim2.new(1, -16, 0, 4)
+        track.Position = UDim2.new(0, 8, 1, -8)
+        track.BackgroundColor3 = Theme.BorderDim
+        track.BorderSizePixel = 0
+        track.ZIndex = 4
+        Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+
+        local fill = Instance.new("Frame", track)
+        fill.Size = UDim2.new(0, 0, 1, 0)
+        fill.BackgroundColor3 = Theme.Emerald
+        fill.BorderSizePixel = 0
+        fill.ZIndex = 5
+        Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+
+        task.spawn(function()
+            while h.Parent do
+                pcall(function()
+                    local cur = getCurrent()
+                    local mx = getMax()
+                    local pct = mx > 0 and math.min(cur / mx, 1) or 0
+                    fill.Size = UDim2.new(pct, 0, 1, 0)
+                    valLbl.Text = string.format("%s/%s", fmt(cur), fmt(mx))
+                    if pct >= 1 then
+                        fill.BackgroundColor3 = Theme.Emerald
+                    else
+                        fill.BackgroundColor3 = Theme.Purple
+                    end
+                end)
+                task.wait(0.5)
+            end
+        end)
     end
 
     -- ============================================
     -- HOME TAB
     -- ============================================
     local home = makeTab("Home", "⌂", 1)
+    section(home, "Live Stats", 1)
+
     local statsCard = Instance.new("Frame", home)
-    statsCard.Size = UDim2.new(1, 0, 0, 64)
+    statsCard.Size = UDim2.new(1, 0, 0, 70)
     statsCard.BackgroundColor3 = Theme.Card
     statsCard.BorderSizePixel = 0
-    statsCard.LayoutOrder = 1
+    statsCard.LayoutOrder = 2
+    statsCard.ZIndex = 3
     Instance.new("UICorner", statsCard).CornerRadius = UDim.new(0, 10)
+    Instance.new("UIStroke", statsCard).Color = Theme.BorderDim
 
-    local killDisplay = Instance.new("TextLabel", statsCard)
-    killDisplay.Size = UDim2.new(0.3, -8, 0, 44)
-    killDisplay.Position = UDim2.new(0, 6, 0, 10)
-    killDisplay.BackgroundColor3 = Theme.CardSub
-    killDisplay.Text = "0"
-    killDisplay.TextColor3 = Theme.Crimson
-    killDisplay.Font = Enum.Font.GothamBold
-    killDisplay.TextSize = 16
-    Instance.new("UICorner", killDisplay).CornerRadius = UDim.new(0, 8)
+    local function statBox(xOff, w, label, accent)
+        local box = Instance.new("Frame", statsCard)
+        box.Size = UDim2.new(w, 0, 0, 52)
+        box.Position = UDim2.new(0, xOff, 0, 9)
+        box.BackgroundColor3 = Theme.CardSub
+        box.BorderSizePixel = 0
+        box.ZIndex = 4
+        Instance.new("UICorner", box).CornerRadius = UDim.new(0, 8)
+        local acc = Instance.new("Frame", box)
+        acc.Size = UDim2.new(0, 3, 0.6, 0)
+        acc.Position = UDim2.new(0, 6, 0.5, 0)
+        acc.AnchorPoint = Vector2.new(0, 0.5)
+        acc.BackgroundColor3 = accent
+        acc.BorderSizePixel = 0
+        acc.ZIndex = 5
+        Instance.new("UICorner", acc).CornerRadius = UDim.new(1, 0)
+        local lbl = Instance.new("TextLabel", box)
+        lbl.Size = UDim2.new(1, -14, 0, 12)
+        lbl.Position = UDim2.new(0, 14, 0, 8)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = label
+        lbl.TextColor3 = Theme.TextMuted
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextSize = 9
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.ZIndex = 5
+        local val = Instance.new("TextLabel", box)
+        val.Size = UDim2.new(1, -14, 0, 22)
+        val.Position = UDim2.new(0, 14, 0, 22)
+        val.BackgroundTransparency = 1
+        val.Text = "0"
+        val.TextColor3 = Theme.Text
+        val.Font = Enum.Font.GothamBold
+        val.TextSize = 17
+        val.TextXAlignment = Enum.TextXAlignment.Left
+        val.ZIndex = 5
+        return val
+    end
 
-    local stoneDisplay = Instance.new("TextLabel", statsCard)
-    stoneDisplay.Size = UDim2.new(0.3, -8, 0, 44)
-    stoneDisplay.Position = UDim2.new(0.33, 0, 0, 10)
-    stoneDisplay.BackgroundColor3 = Theme.CardSub
-    stoneDisplay.Text = "0/6"
-    stoneDisplay.TextColor3 = Theme.Purple
-    stoneDisplay.Font = Enum.Font.GothamBold
-    stoneDisplay.TextSize = 16
-    Instance.new("UICorner", stoneDisplay).CornerRadius = UDim.new(0, 8)
+    local KillVal = statBox(6, 0.3, "KILLS", Theme.Crimson)
+    local StoneVal = statBox(10 + 0.3 * 540, 0.3, "STONES", Theme.Purple)
+    local FragVal = statBox(14 + 0.6 * 540, 0.3, "FRAGS", Theme.Emerald)
 
-    local fragDisplay = Instance.new("TextLabel", statsCard)
-    fragDisplay.Size = UDim2.new(0.3, -8, 0, 44)
-    fragDisplay.Position = UDim2.new(0.66, 0, 0, 10)
-    fragDisplay.BackgroundColor3 = Theme.CardSub
-    fragDisplay.Text = "0"
-    fragDisplay.TextColor3 = Theme.Emerald
-    fragDisplay.Font = Enum.Font.GothamBold
-    fragDisplay.TextSize = 16
-    Instance.new("UICorner", fragDisplay).CornerRadius = UDim.new(0, 8)
+    section(home, "Progress", 3)
+    progressBar(home, "Gauntlet Upgrade (200k)", function() return State.KillCount or 0 end, function() return 200000 end, 4)
+    progressBar(home, "Stormbreaker Frags", function() return State.FragmentCount or 0 end, function() return 100 end, 5)
 
-    button(home, "Rejoin Server", function()
+    section(home, "Quick Actions", 6)
+    button(home, "⇄  Rejoin Server", function()
         TPS:Teleport(game.PlaceId, LocalPlayer)
-    end, Theme.Blue, 2)
-    button(home, "Reset Session Stats", function()
+    end, Theme.Blue, 7)
+    button(home, "⟲  Reset Session Stats", function()
         State.KillCount = 0
         State.FragmentCount = 0
-    end, Theme.Card, 3)
+    end, Theme.Card, 8)
 
     -- ============================================
     -- COMBAT TAB
     -- ============================================
     local combat = makeTab("Combat", "⚔", 2)
-    label(combat, "Throw-Above Auto Kill (HoHo style)", Theme.PurpleBright, 1)
+    section(combat, "Throw-Above Auto Kill", 1)
     toggle(combat, "Auto Kill (one at a time)", false, function(v)
         Config.AutoKill = v
         if v then autoKillLoop() end
@@ -1679,80 +1984,159 @@ local function buildUI()
     slider(combat, "Hitbox Size", 3, 30, 15, function(v) Config.HitboxSize = v end, 6)
     slider(combat, "Lock Timeout", 1, 10, 3, function(v) Config.KillLockTimeout = v end, 7)
 
-    label(combat, "Kill Aura (multi-target)", Theme.PurpleBright, 8)
-    toggle(combat, "Kill Aura", false, function(v)
+    section(combat, "Kill Aura", 8)
+    toggle(combat, "Kill Aura (multi)", false, function(v)
         Config.KillAura = v
         if v then killAuraLoop() end
     end, 9)
     slider(combat, "Aura Range", 10, 200, 55, function(v) Config.AuraRange = v end, 10)
 
-    label(combat, "Auto Farm (spam nearest)", Theme.PurpleBright, 11)
-    toggle(combat, "Auto Farm", false, function(v)
+    section(combat, "Auto Farm", 11)
+    toggle(combat, "Auto Farm (spam nearest)", false, function(v)
         Config.AutoFarm = v
         if v then autoFarmLoop() end
     end, 12)
     slider(combat, "Farm Speed", 1, 50, 10, function(v) Config.FarmSpeed = v / 100 end, 13)
 
     -- ============================================
-    -- GEAR TAB (with auto-collect)
+    -- GEAR TAB (with progress + auto-farm)
     -- ============================================
     local gear = makeTab("Gear", "⚜", 3)
-    label(gear, "Weapons — auto-collects missing items", Theme.PurpleBright, 1)
+    section(gear, "Weapons", 1)
+
     for i, w in ipairs(WeaponDB) do
-        button(gear, w.name, function()
-            local canGet, missing, missingItems = checkRequirements(w.name)
-            if not canGet then
-                -- Auto-collect missing items
-                autoCollectForWeapon(w.name)
-                notify("Auto-Collecting", "Getting required items for " .. w.name, w.color, 4)
-                return
+        -- Each weapon gets its own mini card with progress
+        local card = Instance.new("Frame", gear)
+        card.Size = UDim2.new(1, 0, 0, 60)
+        card.BackgroundColor3 = Theme.Card
+        card.BorderSizePixel = 0
+        card.LayoutOrder = 2 + (i * 2)
+        card.ZIndex = 3
+        card.Parent = gear
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 9)
+        Instance.new("UIStroke", card).Color = w.color
+        card.UIStroke.Transparency = 0.6
+
+        local nameLbl = Instance.new("TextLabel", card)
+        nameLbl.Size = UDim2.new(1, -100, 0, 16)
+        nameLbl.Position = UDim2.new(0, 10, 0, 6)
+        nameLbl.BackgroundTransparency = 1
+        nameLbl.Text = w.name
+        nameLbl.TextColor3 = w.color
+        nameLbl.Font = Enum.Font.GothamBold
+        nameLbl.TextSize = 12
+        nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+        nameLbl.ZIndex = 4
+
+        local statusLbl = Instance.new("TextLabel", card)
+        statusLbl.Size = UDim2.new(1, -100, 0, 12)
+        statusLbl.Position = UDim2.new(0, 10, 0, 22)
+        statusLbl.BackgroundTransparency = 1
+        statusLbl.Text = "checking..."
+        statusLbl.TextColor3 = Theme.TextMuted
+        statusLbl.Font = Enum.Font.Gotham
+        statusLbl.TextSize = 9
+        statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+        statusLbl.ZIndex = 4
+
+        task.spawn(function()
+            while card.Parent do
+                pcall(function()
+                    local canGet, missing = checkRequirements(w.name)
+                    if canGet then
+                        statusLbl.Text = "✓ Ready to collect"
+                        statusLbl.TextColor3 = Theme.Emerald
+                    else
+                        statusLbl.Text = table.concat(missing, " · ")
+                        statusLbl.TextColor3 = Theme.TextMuted
+                    end
+                end)
+                task.wait(1)
             end
-            notify("Getting " .. w.name, "Requirements met", w.color, 3)
-            local terms = {w.name:lower()}
-            if w.name:find("Gauntlet") then terms = {"forge", "celestial"}
-            elseif w.name == "Stormbreaker" or w.name == "Mjolnir" then terms = {"forge"}
-            elseif w.name == "Surtur's Sword" then terms = {"surtur", "catacomb"}
-            elseif w.name == "Hadron Enforcer" then terms = {"lunar", "moon"}
-            elseif w.name == "Cosmi-Rod" then terms = {"celestial", "catacomb"}
-            elseif w.name == "Secret Weapon" then terms = {"secret", "sword"}
-            elseif w.name == "Mechanical Gloves" then terms = {"doom"} end
-            local obj = findObjectByTerms(terms)
-            if obj then
-                local part = obj:IsA("Model") and (obj:FindFirstChild("Handle") or obj:FindFirstChildWhichIsA("BasePart")) or obj
-                if part and part:IsA("BasePart") then
-                    local hrp = getHRP()
-                    if hrp then
-                        hrp.CFrame = part.CFrame * CFrame.new(0, 5, 0)
-                        task.wait(0.5)
-                        pcall(function() LocalPlayer:GetMouse() mouse1click() end)
+        end)
+
+        local collectBtn = Instance.new("TextButton", card)
+        collectBtn.Size = UDim2.new(0, 80, 0, 26)
+        collectBtn.Position = UDim2.new(1, -90, 0, 8)
+        collectBtn.BackgroundColor3 = w.color
+        collectBtn.Text = "COLLECT"
+        collectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        collectBtn.Font = Enum.Font.GothamBold
+        collectBtn.TextSize = 10
+        collectBtn.AutoButtonColor = false
+        collectBtn.ZIndex = 4
+        Instance.new("UICorner", collectBtn).CornerRadius = UDim.new(0, 7)
+        local cg = Instance.new("UIGradient", collectBtn)
+        cg.Color = ColorSequence.new(w.color, w.color:Lerp(Color3.new(0,0,0), 0.3))
+        cg.Rotation = 90
+
+        collectBtn.MouseEnter:Connect(function()
+            TweenService:Create(collectBtn, TweenInfo.new(0.12), {BackgroundColor3 = w.color:Lerp(Color3.new(1,1,1), 0.2)}):Play()
+        end)
+        collectBtn.MouseLeave:Connect(function()
+            TweenService:Create(collectBtn, TweenInfo.new(0.12), {BackgroundColor3 = w.color}):Play()
+        end)
+
+        collectBtn.MouseButton1Click:Connect(function()
+            task.spawn(function()
+                local canGet, missing, missingItems = checkRequirements(w.name)
+                if canGet then
+                    notify("Getting " .. w.name, "Teleporting to location", w.color, 3)
+                    local terms = {w.name:lower()}
+                    if w.name:find("Gauntlet") then terms = {"forge", "celestial"}
+                    elseif w.name == "Stormbreaker" or w.name == "Mjolnir" then terms = {"forge"}
+                    elseif w.name == "Surtur's Sword" then terms = {"surtur", "catacomb"}
+                    elseif w.name == "Hadron Enforcer" then terms = {"lunar", "moon"}
+                    elseif w.name == "Cosmi-Rod" then terms = {"celestial", "catacomb"}
+                    elseif w.name == "Secret Weapon" then terms = {"secret", "sword"}
+                    elseif w.name == "Mechanical Gloves" then terms = {"doom"} end
+                    local obj = findObjectByTerms(terms)
+                    if obj then
+                        local part = obj:IsA("Model") and (obj:FindFirstChild("Handle") or obj:FindFirstChildWhichIsA("BasePart")) or obj
+                        if part and part:IsA("BasePart") then
+                            local hrp = getHRP()
+                            if hrp then
+                                hrp.CFrame = part.CFrame * CFrame.new(0, 5, 0)
+                                task.wait(0.5)
+                                pcall(function() LocalPlayer:GetMouse() mouse1click() end)
+                            end
+                        end
+                    end
+                else
+                    -- START FARMING
+                    local started = startRequirementFarm(w.name)
+                    if started and #started > 0 then
+                        notify("Auto-Farming Started", table.concat(started, " · "), Theme.Gold, 5)
+                    else
+                        notify("Cannot Auto-Farm", "Manually meet: " .. table.concat(missing, ", "), Theme.Crimson, 5)
                     end
                 end
-            end
-        end, w.color, 2 + i)
+            end)
+        end)
     end
 
-    label(gear, "Auto-Collect Materials", Theme.PurpleBright, 20)
+    section(gear, "Auto-Collect Materials", 100)
     toggle(gear, "Auto Lunar Fragment", false, function(v)
         Config.AutoCollectLunar = v
         State.LunarFragment = false
         if v then autoCollectLunarLoop() end
-    end, 21)
+    end, 101)
     toggle(gear, "Auto Celestial Fragment", false, function(v)
         Config.AutoCollectCelestial = v
         State.CelestialFragment = false
         if v then autoCollectCelestialLoop() end
-    end, 22)
+    end, 102)
     toggle(gear, "Auto Frost Fragments (8x)", false, function(v)
         Config.AutoCollectFrost = v
         State.FrostFragments = 0
         if v then autoCollectFrostLoop() end
-    end, 23)
+    end, 103)
 
     -- ============================================
     -- AUTO TAB
     -- ============================================
     local auto = makeTab("Auto", "⚙", 4)
-    label(auto, "Automation", Theme.PurpleBright, 1)
+    section(auto, "Automation", 1)
     toggle(auto, "Auto Collect Stones", false, function(v)
         Config.AutoCollectStones = v
         if v then autoCollectStonesLoop() end
@@ -1778,7 +2162,7 @@ local function buildUI()
     -- MISC TAB
     -- ============================================
     local misc = makeTab("Misc", "✦", 5)
-    label(misc, "Character", Theme.PurpleBright, 1)
+    section(misc, "Character", 1)
     toggle(misc, "Auto Equip Best", true, function(v)
         Config.AutoEquipBest = v
     end, 2)
@@ -1793,7 +2177,7 @@ local function buildUI()
     end, 5)
     slider(misc, "Fly Speed", 10, 200, 60, function(v) Config.FlySpeed = v end, 6)
 
-    label(misc, "Movement", Theme.PurpleBright, 7)
+    section(misc, "Movement", 7)
     toggle(misc, "Speed Hack", false, function(v)
         Config.SpeedHack = v
         local hum = getHumanoid()
@@ -1803,7 +2187,7 @@ local function buildUI()
     toggle(misc, "Infinite Jump", false, function(v) Config.InfiniteJump = v end, 10)
     toggle(misc, "No Clip", false, function(v) Config.NoClip = v end, 11)
 
-    label(misc, "Visuals", Theme.PurpleBright, 12)
+    section(misc, "Visuals", 12)
     toggle(misc, "NPC ESP", false, function(v)
         Config.ESP = v
         if v then espLoop() end
@@ -1814,8 +2198,8 @@ local function buildUI()
         if v then antiFlingLoop() end
     end, 15)
 
-    label(misc, "Actions", Theme.PurpleBright, 16)
-    button(misc, "Reset Character", function()
+    section(misc, "Actions", 16)
+    button(misc, "↺  Reset Character", function()
         local char = getCharacter()
         if char then
             local hum = char:FindFirstChildOfClass("Humanoid")
@@ -1827,11 +2211,11 @@ local function buildUI()
     task.spawn(function()
         while ScreenGui.Parent do
             pcall(function()
-                if killDisplay then killDisplay.Text = fmt(State.KillCount or 0) end
+                if KillVal then KillVal.Text = fmt(State.KillCount or 0) end
                 local st = 0
                 for _, c in pairs(Config.StonesCollected) do if c then st = st + 1 end end
-                if stoneDisplay then stoneDisplay.Text = st .. "/6" end
-                if fragDisplay then fragDisplay.Text = fmt(State.FragmentCount or 0) end
+                if StoneVal then StoneVal.Text = st .. "/6" end
+                if FragVal then FragVal.Text = fmt(State.FragmentCount or 0) end
                 if StatsBar then
                     StatsBar.Text = string.format("kills %s · stones %d/6 · frags %s",
                         fmt(State.KillCount or 0), st, fmt(State.FragmentCount or 0))
@@ -1843,6 +2227,7 @@ local function buildUI()
                 if StatusDot then
                     local active = Config.AutoKill or Config.KillAura or Config.AutoFarm
                         or Config.AutoTemplarFarm or Config.AutoAstraWaves or Config.AutoCollectStones
+                        or Config.ReqFarmActive
                     StatusDot.BackgroundColor3 = active and Theme.Emerald or Theme.TextMuted
                 end
             end)
@@ -1871,6 +2256,7 @@ fullBrightLoop()
 noClipLoop()
 autoEquipLoop()
 infiniteJumpHandler()
+reqFarmWatcher()
 print("[P] Stage 4: loops started")
 
 LocalPlayer.CharacterAdded:Connect(function(char)
@@ -1886,23 +2272,23 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 task.wait(0.3)
-notify("P | Thanos Simulator", "v5.1 loaded — click toggles", Theme.Purple, 4)
+notify("P | Thanos Simulator", "v6.0 loaded", Theme.Purple, 4)
 task.wait(0.2)
-notify("HoHo AutoKill", "Target lock + hitbox expand", Theme.Emerald, 4)
+notify("Auto-Farm Ready", "Click weapon COLLECT to auto-farm", Theme.Emerald, 4)
 task.wait(0.2)
-notify("Auto-Collect", "Missing requirements now auto-farmed", Theme.Gold, 4)
+notify("Starfield UI", "Drag title bar anywhere", Theme.Gold, 4)
 
 pcall(function()
     StarterGui:SetCore("SendNotification", {
         Title = "P | Thanos Simulator",
-        Text = "Loaded. Toggles require click · auto-collect ready.",
+        Text = "Loaded. Click COLLECT to auto-farm requirements.",
         Duration = 6,
     })
 end)
 
 print("[P] Loaded successfully")
 
-end) -- end pcall
+end)
 
 if not ok then
     warn("[P] SCRIPT ERROR:", err)
